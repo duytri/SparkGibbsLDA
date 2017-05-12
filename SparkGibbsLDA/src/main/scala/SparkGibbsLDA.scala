@@ -1,4 +1,4 @@
-package main.scala.sglda
+package main.scala
 
 object SparkGibbsLDA {
   def main(args: Array[String]): Unit = {
