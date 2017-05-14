@@ -6,7 +6,7 @@ import java.io.BufferedReader
 import java.util.StringTokenizer
 import scala.collection.mutable.Map
 
-class File2Dictionary {
+object File2Dictionary {
   //---------------------------------------------------
   // I/O methods
   //---------------------------------------------------

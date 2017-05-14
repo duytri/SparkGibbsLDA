@@ -5,7 +5,7 @@ import java.io.BufferedWriter
 import java.io.FileWriter
 import scala.collection.mutable.Map
 
-class Dictionary2File {
+object Dictionary2File {
   //---------------------------------------------------
   // I/O methods
   //---------------------------------------------------

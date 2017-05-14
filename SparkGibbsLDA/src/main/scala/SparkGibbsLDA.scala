@@ -5,19 +5,20 @@ import org.apache.spark.SparkContext
 import main.scala.obj.Dictionary
 import main.scala.obj.Document
 import main.scala.helper.LDACmdOption
-import org.apache.commons.cli.CommandLine
-import org.apache.commons.cli.MissingOptionException
-import org.apache.commons.cli.MissingArgumentException
+import main.java.commons.cli.MissingOptionException
+import main.java.commons.cli.MissingArgumentException
+import main.java.commons.cli.CommandLine
 
 object SparkGibbsLDA {
   def main(args: Array[String]): Unit = {
     println("#################### Collapsed Gibbs sampling LDA in Apache Spark ####################")
     try {
       val cmd = LDACmdOption.getArguments(args)
-      if (cmd.hasOption('h')) {
+      if (cmd.hasOption("help")) {
         LDACmdOption.showHelp()
       } else {
-
+        // set user parameters
+        
         //~~~~~~~~~~~ Timer ~~~~~~~~~~~
         val startTime = System.currentTimeMillis()
 
@@ -38,8 +39,14 @@ object SparkGibbsLDA {
         println("#################### Finished in " + hours + " hour(s) " + minutes + " minute(s) " + seconds + " second(s) and " + millis + " millisecond(s) ####################")
       }
     } catch {
-      case moe: MissingOptionException => LDACmdOption.showHelp()
-      case mae: MissingArgumentException => LDACmdOption.showHelp()
+      case moe: MissingOptionException => {
+        println("ERROR!!! Chua nhap day du cac tham so.")
+        LDACmdOption.showHelp()
+      }
+      case mae: MissingArgumentException => {
+        println("ERROR!!! Thieu gia tri cua cac tham so.")
+        LDACmdOption.showHelp()
+      }
     }
   }
 }

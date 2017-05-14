@@ -209,6 +209,5 @@
 	<classpathentry kind="lib" path="libs/xmlenc-0.52.jar"/>
 	<classpathentry kind="lib" path="libs/xz-1.0.jar"/>
 	<classpathentry kind="lib" path="libs/zookeeper-3.4.6.jar"/>
-	<classpathentry kind="lib" path="libs/commons-cli-1.4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -9,7 +9,7 @@ import scala.collection.mutable.ArrayBuffer
 import main.scala.obj.Document
 import main.scala.obj.Dictionary
 
-class File2Model {
+object File2Model {
   //---------------------------------------------------------------
   //	Parameters
   //---------------------------------------------------------------
@@ -122,8 +122,7 @@ class File2Model {
 			false
 		
 		// read dictionary
-		var dict = new File2Dictionary
-		data.localDict = new Dictionary(dict.readWordMap(dir + File.separator + wordMapFile))
+		data.localDict = new Dictionary(File2Dictionary.readWordMap(dir + File.separator + wordMapFile))
 		
 		true
 	}
