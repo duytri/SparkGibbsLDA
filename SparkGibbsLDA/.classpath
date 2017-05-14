@@ -30,7 +30,6 @@
 	<classpathentry kind="lib" path="libs/chill-java-0.8.0.jar"/>
 	<classpathentry kind="lib" path="libs/commons-beanutils-1.7.0.jar"/>
 	<classpathentry kind="lib" path="libs/commons-beanutils-core-1.8.0.jar"/>
-	<classpathentry kind="lib" path="libs/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="libs/commons-codec-1.10.jar"/>
 	<classpathentry kind="lib" path="libs/commons-collections-3.2.2.jar"/>
 	<classpathentry kind="lib" path="libs/commons-compiler-3.0.0.jar"/>
@@ -210,5 +209,6 @@
 	<classpathentry kind="lib" path="libs/xmlenc-0.52.jar"/>
 	<classpathentry kind="lib" path="libs/xz-1.0.jar"/>
 	<classpathentry kind="lib" path="libs/zookeeper-3.4.6.jar"/>
+	<classpathentry kind="lib" path="libs/commons-cli-1.4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
