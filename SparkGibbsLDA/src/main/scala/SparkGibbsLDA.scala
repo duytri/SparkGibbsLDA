@@ -18,7 +18,7 @@ object SparkGibbsLDA {
         LDACmdOption.showHelp()
       } else {
         // set user parameters
-        
+
         //~~~~~~~~~~~ Timer ~~~~~~~~~~~
         val startTime = System.currentTimeMillis()
 
@@ -44,9 +44,11 @@ object SparkGibbsLDA {
         LDACmdOption.showHelp()
       }
       case mae: MissingArgumentException => {
+        mae.printStackTrace()
         println("ERROR!!! Thieu gia tri cua cac tham so.")
         LDACmdOption.showHelp()
       }
+      case e: Throwable => e.printStackTrace()
     }
   }
 }
