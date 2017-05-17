@@ -8,6 +8,7 @@ import main.scala.helper.LDACmdOption
 import main.java.commons.cli.MissingOptionException
 import main.java.commons.cli.MissingArgumentException
 import main.java.commons.cli.CommandLine
+import main.java.commons.cli.UnrecognizedOptionException
 
 object SparkGibbsLDA {
   def main(args: Array[String]): Unit = {
@@ -40,12 +41,17 @@ object SparkGibbsLDA {
       }
     } catch {
       case moe: MissingOptionException => {
-        println("ERROR!!! Chua nhap day du cac tham so.")
+        println("ERROR!!! Phai nhap day du cac tham so: alpha, beta, directory, datafile, ntopics, niters")
         LDACmdOption.showHelp()
       }
       case mae: MissingArgumentException => {
         mae.printStackTrace()
         println("ERROR!!! Thieu gia tri cua cac tham so.")
+        LDACmdOption.showHelp()
+      }
+      case uoe: UnrecognizedOptionException => {
+        uoe.printStackTrace()
+        println("ERROR!!! Chuong trinh khong ho tro tham so ban da nhap.")
         LDACmdOption.showHelp()
       }
       case e: Throwable => e.printStackTrace()
