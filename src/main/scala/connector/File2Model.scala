@@ -76,7 +76,7 @@ object File2Model {
     z = new Array[Array[Int]](M)
     data = new LDADataset(M)
     data.V = V
-    for (i <- 0 to M) {
+    for (i <- 0 until M) {
       line = reader.readLine
       val tknr = new StringTokenizer(line, " \t\r\n")
 
@@ -85,7 +85,7 @@ object File2Model {
       var words = new ArrayBuffer[Int]
       var topics = new ArrayBuffer[Int]
 
-      for (j <- 0 to length) {
+      for (j <- 0 until length) {
         val token = tknr.nextToken();
 
         val tknr2 = new StringTokenizer(token, ":");

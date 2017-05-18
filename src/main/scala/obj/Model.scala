@@ -8,6 +8,7 @@ import main.scala.helper.Constants
 import main.java.commons.cli.CommandLine
 import main.scala.connector.File2LDADataset
 import main.scala.connector.File2Model
+import scala.util.Random
 
 /**
  * Lop bieu dien MODEL cua LDA
@@ -54,91 +55,93 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
   /**
    * initialize the model
    */
-  def init(option: CommandLine): Boolean = {
-    if (option == null)
-      false
+  def init(params: Parameter): Boolean = {
+    if (params == null)
+      return false
 
-    modelName = option.getOptionValue("modelname")
-    K = option.getOptionValue("K").toInt
+    modelName = params.modelname
+    K = params.K
 
-    alpha = option.getOptionValue("alpha").toDouble
+    alpha = params.alpha
     if (alpha < 0.0)
       alpha = 50.0 / K;
 
-    if (option.getOptionValue("beta").toDouble >= 0)
-      beta = option.getOptionValue("beta").toDouble
+    if (params.beta >= 0)
+      beta = params.beta
 
-    niters = option.getOptionValue("niters").toInt
+    niters = params.niters
 
-    dir = option.getOptionValue("directory")
+    dir = params.directory
     if (dir.endsWith(File.separator))
       dir = dir.substring(0, dir.length - 1)
 
-    dfile = option.getOptionValue("datafile")
-    twords = option.getOptionValue("twords").toInt
-    wordMapFile = option.getOptionValue("wordmap")
+    dfile = params.datafile
+    twords = params.twords
+    wordMapFile = params.wordMapFileName
 
-    return true;
+    return true
   }
 
   /**
    * Init parameters for estimation
    */
-  def initNewModel(option: CommandLine): Boolean = {
-    if (!init(option))
-      false
+  def initNewModel(params: Parameter): Boolean = {
+    if (!init(params))
+      return false
 
+    val random = new Random
     p = new Array[Double](K)
 
     data = File2LDADataset.readDataSet(dir + File.separator + dfile)
     if (data == null) {
       println("Fail to read training data!\n")
-      false
+      return false
     }
 
     //+ allocate memory and assign values for variables		
     M = data.M
     V = data.V
-    dir = option.getOptionValue("directory")
-    savestep = option.getOptionValue("savestep").toInt
+    dir = params.directory
+    savestep = params.savestep
 
     // K: from command line or default value
     // alpha, beta: from command line or default values
     // niters, savestep: from command line or default values
 
     nw = Array.ofDim[Int](V, K)
-    for (w <- 0 to V) {
-      for (k <- 0 to K) {
+    for (w <- 0 until V) {
+      for (k <- 0 until K) {
         nw(w)(k) = 0
       }
     }
 
     nd = Array.ofDim[Int](M, K)
-    for (m <- 0 to M) {
-      for (k <- 0 to K) {
+    for (m <- 0 until M) {
+      for (k <- 0 until K) {
         nd(m)(k) = 0
       }
     }
 
     nwsum = Array.ofDim[Int](K)
-    for (k <- 0 to K) {
+    for (k <- 0 until K) {
       nwsum(k) = 0
     }
 
     ndsum = Array.ofDim[Int](M)
-    for (m <- 0 to M) {
+    for (m <- 0 until M) {
       ndsum(m) = 0
     }
 
-    z = new Array[Array[Int]](M)
-    for (m <- 0 to M) {
+    z = Array.ofDim[Array[Int]](M)
+    for (m <- 0 until M) {
       val N = data.docs(m).length
       //z(m) = new Array[Int]
 
       //initilize for z
-      for (n <- 0 to N) {
-        val topic = Math.floor(Math.random() * K).toInt
-        z(m) :+= topic
+      z(m) = Array.ofDim[Int](N)
+      for (n <- 0 until N) {
+        val topic = random.nextInt(K)
+        z(m)(n) = topic
 
         // number of instances of word assigned to topic j
         nw(data.docs(m).words(n))(topic) += 1
@@ -154,17 +157,18 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     theta = Array.ofDim[Double](M, K)
     phi = Array.ofDim[Double](K, V)
 
-    true
+    return true
   }
 
   /**
    * Init parameters for inference
    * @param newData DataSet for which we do inference
    */
-  def initNewModel(option: CommandLine, newData: LDADataset, trnModel: Model): Boolean = {
-    if (!init(option))
-      false
+  def initNewModel(params: Parameter, newData: LDADataset, trnModel: Model): Boolean = {
+    if (!init(params))
+      return false
 
+    val random = new Random
     K = trnModel.K
     alpha = trnModel.alpha
     beta = trnModel.beta;
@@ -177,8 +181,8 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     //+ allocate memory and assign values for variables		
     M = data.M
     V = data.V
-    dir = option.getOptionValue("directory")
-    savestep = option.getOptionValue("savestep").toInt
+    dir = params.directory
+    savestep = params.savestep
     //println("M:" + M);
     //println("V:" + V);
 
@@ -187,38 +191,39 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     // niters, savestep: from command line or default values
 
     nw = Array.ofDim[Int](V, K)
-    for (w <- 0 to V) {
-      for (k <- 0 to K) {
+    for (w <- 0 until V) {
+      for (k <- 0 until K) {
         nw(w)(k) = 0
       }
     }
 
     nd = Array.ofDim[Int](M, K)
-    for (m <- 0 to M) {
-      for (k <- 0 to K) {
+    for (m <- 0 until M) {
+      for (k <- 0 until K) {
         nd(m)(k) = 0
       }
     }
 
     nwsum = Array.ofDim[Int](K)
-    for (k <- 0 to K) {
+    for (k <- 0 until K) {
       nwsum(k) = 0
     }
 
     ndsum = Array.ofDim[Int](M)
-    for (m <- 0 to M) {
+    for (m <- 0 until M) {
       ndsum(m) = 0
     }
 
     z = new Array[Array[Int]](M)
-    for (m <- 0 to M) {
+    for (m <- 0 until M) {
       val N = data.docs(m).length
       //z(m) = new Array[Int]
 
       //initilize for z
-      for (n <- 0 to N) {
-        val topic = Math.floor(Math.random() * K).toInt
-        z(m) :+= topic
+      z(m) = new Array[Int](N)
+      for (n <- 0 until N) {
+        val topic = random.nextInt(K)
+        z(m)(n) = topic
 
         // number of instances of word assigned to topic j
         nw(data.docs(m).words(n))(topic) += 1
@@ -234,43 +239,43 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     theta = Array.ofDim[Double](M, K)
     phi = Array.ofDim[Double](K, V)
 
-    true
+    return true
   }
 
   /**
    * Init parameters for inference
    * reading new dataset from file
    */
-  def initNewModel(option: CommandLine, trnModel: Model): Boolean = {
-    if (!init(option))
-      false
+  def initNewModel(params: Parameter, trnModel: Model): Boolean = {
+    if (!init(params))
+      return false
 
     val dataset = File2LDADataset.readDataSet(dir + File.separator + dfile, trnModel.data.localDict)
     if (dataset == null) {
       println("Fail to read dataset!\n")
-      false
+      return false
     }
 
-    initNewModel(option, dataset, trnModel)
+    initNewModel(params, dataset, trnModel)
   }
 
   /**
    * init parameter for continue estimating or for later inference
    */
-  def initEstimatedModel(option: CommandLine): Boolean = {
-    if (!init(option))
-      false
+  def initEstimatedModel(params: Parameter): Boolean = {
+    if (!init(params))
+      return false
 
     p = new Array[Double](K)
 
-    dir = option.getOptionValue("directory")
-    modelName = option.getOptionValue("modelname")
-    wordMapFile = option.getOptionValue("wordmap")
-    savestep = option.getOptionValue("savestep").toInt
+    dir = params.directory
+    modelName = params.modelname
+    wordMapFile = params.wordMapFileName
+    savestep = params.savestep
     // load model, i.e., read z and trndata
     if (!File2Model.loadModel(dir, modelName, othersSuffix, tassignSuffix, wordMapFile)) {
       System.out.println("Fail to load word-topic assignment file of the model!\n");
-       false
+      return false
     }
 
     System.out.println("Model loaded:");
@@ -280,34 +285,34 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     System.out.println("\tV:" + V);
 
     nw = Array.ofDim[Int](V, K)
-    for (w <- 0 to V) {
-      for (k <- 0 to K) {
+    for (w <- 0 until V) {
+      for (k <- 0 until K) {
         nw(w)(k) = 0
       }
     }
 
     nd = Array.ofDim[Int](M, K)
-    for (m <- 0 to M) {
-      for (k <- 0 to K) {
+    for (m <- 0 until M) {
+      for (k <- 0 until K) {
         nd(m)(k) = 0
       }
     }
 
     nwsum = Array.ofDim[Int](K)
-    for (k <- 0 to K) {
+    for (k <- 0 until K) {
       nwsum(k) = 0
     }
 
     ndsum = Array.ofDim[Int](M)
-    for (m <- 0 to M) {
+    for (m <- 0 until M) {
       ndsum(m) = 0
     }
 
-    for (m <- 0 to data.M) {
+    for (m <- 0 until data.M) {
       val N = data.docs(m).length
 
       // assign values for nw, nd, nwsum, and ndsum
-      for (n <- 0 to N) {
+      for (n <- 0 until N) {
         val w = data.docs(m).words(n)
         val topic = z(m)(n)
 
@@ -325,6 +330,6 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     theta = Array.ofDim[Double](M, K)
     phi = Array.ofDim[Double](K, V)
 
-    true
+    return true
   }
 }

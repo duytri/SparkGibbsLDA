@@ -25,7 +25,7 @@ object File2LDADataset {
     val M = line.toInt
 
     data.M = M
-    for (i <- 0 to M) {
+    for (i <- 0 until M) {
       data.setDoc(reader.readLine(), i)
     }
 
@@ -56,7 +56,7 @@ object File2LDADataset {
     val M = line.toInt
 
     data.M = M
-    for (i <- 0 to M) {
+    for (i <- 0 until M) {
       data.setDoc(reader.readLine(), i)
     }
     reader.close()
@@ -82,7 +82,7 @@ object File2LDADataset {
    */
   def readDataSet(strs: ArrayBuffer[String]): LDADataset = {
     var data = new LDADataset
-    for (i <- 0 to strs.length) {
+    for (i <- 0 until strs.length) {
       data.setDoc(strs(i), i)
     }
     data

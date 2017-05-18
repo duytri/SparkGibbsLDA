@@ -23,7 +23,7 @@ object File2Dictionary {
     val nwords = line.toInt
 
     //read map
-    for(i<-0 to nwords){
+    for(i<-0 until nwords){
       line = reader.readLine();
       val tknr = new StringTokenizer(line, " \t\n\r")
 

@@ -8,7 +8,7 @@ import java.io.File
 import main.scala.obj.LDADataset
 import scala.collection.mutable.ArrayBuffer
 
-class Model2File {
+object Model2File {
 
   /**
    * Save word-topic assignments for this model
@@ -16,8 +16,8 @@ class Model2File {
   def saveModelTAssign(filename: String, data: LDADataset, z: Array[Array[Int]]): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
     //write docs with topic assignments for words
-    for (i <- 0 to data.M) {
-      for (j <- 0 to data.docs(i).length) {
+    for (i <- 0 until data.M) {
+      for (j <- 0 until data.docs(i).length) {
         writer.write(data.docs(i).words(j) + ":" + z(i)(j) + " ")
       }
       writer.write("\n")
@@ -31,8 +31,8 @@ class Model2File {
    */
   def saveModelTheta(filename: String, theta: Array[Array[Double]], M: Int, K: Int): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
-    for (i <- 0 to M) {
-      for (j <- 0 to K) {
+    for (i <- 0 until M) {
+      for (j <- 0 until K) {
         writer.write(theta(i)(j) + " ");
       }
       writer.write("\n");
@@ -46,8 +46,8 @@ class Model2File {
    */
   def saveModelPhi(filename: String, phi: Array[Array[Double]], K: Int, V: Int): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
-    for (i <- 0 to K) {
-      for (j <- 0 to V) {
+    for (i <- 0 until K) {
+      for (j <- 0 until V) {
         writer.write(phi(i)(j) + " ");
       }
       writer.write("\n");
@@ -81,9 +81,9 @@ class Model2File {
     val writer = new BufferedWriter(new FileWriter(filename))
     val topwords = if (twords > V) V else twords
 
-    for (k <- 0 to K) {
+    for (k <- 0 until K) {
       var wordsProbsList = new ArrayBuffer[(Int, Double)]
-      for (w <- 0 to V) {
+      for (w <- 0 until V) {
         wordsProbsList.append((w, phi(k)(w)))
       } //end foreach word
 
@@ -91,7 +91,7 @@ class Model2File {
       writer.write("Topic " + k + "th:\n");
       wordsProbsList.sortWith(_._2 > _._2)
 
-      for (i <- 0 to topwords) {
+      for (i <- 0 until topwords) {
         if (data.localDict.contains(wordsProbsList(i)._1)) {
           val word = data.localDict.getWord(wordsProbsList(i)._1)
 
@@ -108,26 +108,26 @@ class Model2File {
    * Save model
    */
   def saveModel(modelName: String, model: Model): Boolean = {
-    if (!saveModelTAssign(model.dir + File.separator + model.modelName + model.tassignSuffix, model.data, model.z)) {
-      false
+    if (!saveModelTAssign(model.dir + File.separator + "output" + File.separator + model.modelName + model.tassignSuffix, model.data, model.z)) {
+      return false
     }
 
-    if (!saveModelOthers(model.dir + File.separator + model.modelName + model.othersSuffix, model.alpha, model.beta, model.K, model.M, model.V, model.liter)) {
-      false
+    if (!saveModelOthers(model.dir + File.separator + "output" + File.separator + model.modelName + model.othersSuffix, model.alpha, model.beta, model.K, model.M, model.V, model.liter)) {
+      return false
     }
 
-    if (!saveModelTheta(model.dir + File.separator + model.modelName + model.thetaSuffix, model.theta, model.M, model.K)) {
-      false
+    if (!saveModelTheta(model.dir + File.separator + "output" + File.separator + model.modelName + model.thetaSuffix, model.theta, model.M, model.K)) {
+      return false
     }
 
-    if (!saveModelPhi(model.dir + File.separator + model.modelName + model.phiSuffix, model.phi, model.K, model.V)) {
-      false
+    if (!saveModelPhi(model.dir + File.separator + "output" + File.separator + model.modelName + model.phiSuffix, model.phi, model.K, model.V)) {
+      return false
     }
 
     if (model.twords > 0) {
-      if (!saveModelTwords(model.dir + File.separator + model.modelName + model.twordsSuffix, model.twords, model.K, model.V, model.phi, model.data))
-        false
+      if (!saveModelTwords(model.dir + File.separator + "output" + File.separator + model.modelName + model.twordsSuffix, model.twords, model.K, model.V, model.phi, model.data))
+        return false
     }
-    true
+    return true
   }
 }

@@ -18,7 +18,7 @@ class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var
   // Constructor
   //--------------------------------------------------------------
   def this() = {
-    this(new Dictionary, null, 0, 0, null, null)
+    this(new Dictionary, new ArrayBuffer[Document], 0, 0, null, null)
   }
 
   def this(M: Int) = {
@@ -48,11 +48,12 @@ class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var
    * @param idx index in the document array
    */
   def setDoc(content: String, idx: Int): Unit = {
+    //println(content)
     if (0 <= idx && idx < M) {
       var ids = new ArrayBuffer[Int]
 
       content.split("[ \\t\\n]").foreach(word => {
-        var _id = localDict.getWord2Id.size
+        var _id = localDict.word2id.size
 
         if (localDict.contains(word))
           _id = localDict.getId(word)
@@ -75,10 +76,11 @@ class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var
           ids.append(_id)
         }
       })
-
+      
       val doc = new Document(ids, content)
-      docs(idx) = doc
-      V = localDict.getWord2Id.size
+      
+      docs.insert(idx, doc)
+      V = localDict.word2id.size
     }
   }
 }
