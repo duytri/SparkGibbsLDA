@@ -2,6 +2,7 @@ package main.scala.obj
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Map
+import scala.collection.mutable.HashMap
 
 /**
  * Kho chua du lieu cua LDA
@@ -26,7 +27,7 @@ class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var
   }
 
   def this(M: Int, globalDict: Dictionary) = {
-    this(new Dictionary, new ArrayBuffer[Document], M, 0, null, globalDict)
+    this(new Dictionary, new ArrayBuffer[Document], M, 0, new HashMap[Int, Int], globalDict)
   }
 
   //-------------------------------------------------------------
@@ -39,7 +40,7 @@ class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var
    */
   def setDoc(doc: Document, idx: Int): Unit = {
     if (0 <= idx && idx < M) {
-      docs(idx) = doc
+      docs.insert(idx, doc)
     }
   }
   /**

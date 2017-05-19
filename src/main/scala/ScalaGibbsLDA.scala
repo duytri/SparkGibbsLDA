@@ -1,21 +1,20 @@
 package main.scala
 
-import org.apache.spark.SparkConf
-import org.apache.spark.SparkContext
 import main.scala.obj.Dictionary
 import main.scala.obj.Document
 import main.scala.helper.LDACmdOption
 import main.java.commons.cli.MissingOptionException
 import main.java.commons.cli.MissingArgumentException
 import main.java.commons.cli.CommandLine
+import main.java.commons.cli.Option
 import main.java.commons.cli.UnrecognizedOptionException
 import main.scala.obj.Parameter
 import main.scala.helper.Utils
 
-object SparkGibbsLDA {
+object ScalaGibbsLDA {
   def main(args: Array[String]): Unit = {
     println("Current directory: " + System.getProperty("user.dir"))
-    println("#################### Gibbs sampling LDA in Apache Spark ####################")
+    println("#################### Gibbs sampling LDA ####################")
     try {
       var cmd = LDACmdOption.getArguments(args)
       if (cmd.hasOption("help")) {

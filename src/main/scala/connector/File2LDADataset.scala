@@ -17,14 +17,13 @@ object File2LDADataset {
    *  @return dataset if success and null otherwise
    */
   def readDataSet(filename: String): LDADataset = {
-    var data = new LDADataset
     val file = new File(filename)
     val reader = new BufferedReader(new FileReader(file))
 
     var line = reader.readLine()
     val M = line.toInt
+    var data = new LDADataset(M)
 
-    data.M = M
     for (i <- 0 until M) {
       data.setDoc(reader.readLine(), i)
     }
@@ -40,8 +39,18 @@ object File2LDADataset {
    * @return dataset if success and null otherwise
    */
   def readDataSet(filename: String, dict: Dictionary): LDADataset = {
-    var data = readDataSet(filename)
-    data.globalDict = dict
+    val file = new File(filename)
+    val reader = new BufferedReader(new FileReader(file))
+
+    var line = reader.readLine()
+    val M = line.toInt
+    var data = new LDADataset(M, dict)
+
+    for (i <- 0 until M) {
+      data.setDoc(reader.readLine(), i)
+    }
+
+    reader.close()
     data
   }
 
@@ -50,12 +59,11 @@ object File2LDADataset {
    *  @return dataset if success and null otherwise
    */
   def readDataSet(reader: BufferedReader): LDADataset = {
-    var data = new LDADataset
     //read number of document
     var line = reader.readLine()
     val M = line.toInt
+    var data = new LDADataset(M)
 
-    data.M = M
     for (i <- 0 until M) {
       data.setDoc(reader.readLine(), i)
     }
@@ -70,8 +78,14 @@ object File2LDADataset {
    * @return dataset if success and null otherwise
    */
   def readDataSet(reader: BufferedReader, dict: Dictionary): LDADataset = {
-    var data = readDataSet(reader)
-    data.globalDict = dict
+    var line = reader.readLine()
+    val M = line.toInt
+    var data = new LDADataset(M, dict)
+
+    for (i <- 0 until M) {
+      data.setDoc(reader.readLine(), i)
+    }
+    reader.close()
     data
   }
 
@@ -81,7 +95,7 @@ object File2LDADataset {
    * @return dataset if success and null otherwise
    */
   def readDataSet(strs: ArrayBuffer[String]): LDADataset = {
-    var data = new LDADataset
+    var data = new LDADataset(strs.length)
     for (i <- 0 until strs.length) {
       data.setDoc(strs(i), i)
     }
@@ -95,8 +109,10 @@ object File2LDADataset {
    * @return dataset if success and null otherwise
    */
   def readDataSet(strs: ArrayBuffer[String], dict: Dictionary): LDADataset = {
-    var data = readDataSet(strs)
-    data.globalDict = dict
+    var data = new LDADataset(strs.length, dict)
+    for (i <- 0 until strs.length) {
+      data.setDoc(strs(i), i)
+    }
     data
   }
 }

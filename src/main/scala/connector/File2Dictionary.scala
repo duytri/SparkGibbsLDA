@@ -5,6 +5,7 @@ import java.io.FileReader
 import java.io.BufferedReader
 import java.util.StringTokenizer
 import scala.collection.mutable.Map
+import scala.collection.mutable.HashMap
 
 object File2Dictionary {
   //---------------------------------------------------
@@ -14,7 +15,7 @@ object File2Dictionary {
    * read dictionary from file
    */
   def readWordMap(wordMapFile: String): Map[String, Int] = {
-    var result: Map[String, Int] = null
+    var result: Map[String, Int] = new HashMap[String, Int]
     val file = new File(wordMapFile)
     val reader = new BufferedReader(new FileReader(file))
 

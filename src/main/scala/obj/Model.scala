@@ -8,7 +8,6 @@ import main.scala.helper.Constants
 import main.java.commons.cli.CommandLine
 import main.scala.connector.File2LDADataset
 import main.scala.connector.File2Model
-import scala.util.Random
 
 /**
  * Lop bieu dien MODEL cua LDA
@@ -52,6 +51,7 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
   //---------------------------------------------------------------
   //	Init Methods
   //---------------------------------------------------------------
+
   /**
    * initialize the model
    */
@@ -89,7 +89,6 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     if (!init(params))
       return false
 
-    val random = new Random
     p = new Array[Double](K)
 
     data = File2LDADataset.readDataSet(dir + File.separator + dfile)
@@ -140,7 +139,7 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
       //initilize for z
       z(m) = Array.ofDim[Int](N)
       for (n <- 0 until N) {
-        val topic = random.nextInt(K)
+        val topic = Math.floor(Math.random() * K).toInt
         z(m)(n) = topic
 
         // number of instances of word assigned to topic j
@@ -168,7 +167,6 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     if (!init(params))
       return false
 
-    val random = new Random
     K = trnModel.K
     alpha = trnModel.alpha
     beta = trnModel.beta;
@@ -222,7 +220,7 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
       //initilize for z
       z(m) = new Array[Int](N)
       for (n <- 0 until N) {
-        val topic = random.nextInt(K)
+        val topic = Math.floor(Math.random() * K).toInt
         z(m)(n) = topic
 
         // number of instances of word assigned to topic j
@@ -273,16 +271,26 @@ class Model(var tassignSuffix: String, var thetaSuffix: String, var phiSuffix: S
     wordMapFile = params.wordMapFileName
     savestep = params.savestep
     // load model, i.e., read z and trndata
-    if (!File2Model.loadModel(dir, modelName, othersSuffix, tassignSuffix, wordMapFile)) {
+    val f2m = new File2Model
+    if (!f2m.loadModel(dir, modelName + "-final", othersSuffix, tassignSuffix, wordMapFile)) {
       System.out.println("Fail to load word-topic assignment file of the model!\n");
       return false
+    } else {
+      alpha = f2m.getAlpha()
+      beta = f2m.getBeta()
+      data = f2m.getLDADataset()
+      M = f2m.getM()
+      V = f2m.getV()
+      z = f2m.getZ()
+      liter = f2m.getLIter()
     }
 
-    System.out.println("Model loaded:");
-    System.out.println("\talpha:" + alpha);
-    System.out.println("\tbeta:" + beta);
-    System.out.println("\tM:" + M);
-    System.out.println("\tV:" + V);
+    System.out.println("Model loaded:")
+    System.out.println("\talpha:" + alpha)
+    System.out.println("\tbeta:" + beta)
+    System.out.println("\tM:" + M)
+    System.out.println("\tV:" + V)
+    System.out.println("\tLast iteration:" + liter)
 
     nw = Array.ofDim[Int](V, K)
     for (w <- 0 until V) {

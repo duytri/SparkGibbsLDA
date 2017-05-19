@@ -67,7 +67,7 @@ object Model2File {
     writer.write("ntopics=" + K + "\n");
     writer.write("ndocs=" + M + "\n");
     writer.write("nwords=" + V + "\n");
-    writer.write("liters=" + liter + "\n");
+    writer.write("liter=" + liter + "\n");
 
     writer.close
     true
@@ -89,7 +89,7 @@ object Model2File {
 
       //print topic				
       writer.write("Topic " + k + "th:\n");
-      wordsProbsList.sortWith(_._2 > _._2)
+      wordsProbsList = wordsProbsList.sortWith(_._2 > _._2)
 
       for (i <- 0 until topwords) {
         if (data.localDict.contains(wordsProbsList(i)._1)) {
@@ -108,24 +108,24 @@ object Model2File {
    * Save model
    */
   def saveModel(modelName: String, model: Model): Boolean = {
-    if (!saveModelTAssign(model.dir + File.separator + "output" + File.separator + model.modelName + model.tassignSuffix, model.data, model.z)) {
+    if (!saveModelTAssign(model.dir + File.separator + "output" + File.separator + modelName + model.tassignSuffix, model.data, model.z)) {
       return false
     }
 
-    if (!saveModelOthers(model.dir + File.separator + "output" + File.separator + model.modelName + model.othersSuffix, model.alpha, model.beta, model.K, model.M, model.V, model.liter)) {
+    if (!saveModelOthers(model.dir + File.separator + "output" + File.separator + modelName + model.othersSuffix, model.alpha, model.beta, model.K, model.M, model.V, model.liter)) {
       return false
     }
 
-    if (!saveModelTheta(model.dir + File.separator + "output" + File.separator + model.modelName + model.thetaSuffix, model.theta, model.M, model.K)) {
+    if (!saveModelTheta(model.dir + File.separator + "output" + File.separator + modelName + model.thetaSuffix, model.theta, model.M, model.K)) {
       return false
     }
 
-    if (!saveModelPhi(model.dir + File.separator + "output" + File.separator + model.modelName + model.phiSuffix, model.phi, model.K, model.V)) {
+    if (!saveModelPhi(model.dir + File.separator + "output" + File.separator + modelName + model.phiSuffix, model.phi, model.K, model.V)) {
       return false
     }
 
     if (model.twords > 0) {
-      if (!saveModelTwords(model.dir + File.separator + "output" + File.separator + model.modelName + model.twordsSuffix, model.twords, model.K, model.V, model.phi, model.data))
+      if (!saveModelTwords(model.dir + File.separator + "output" + File.separator + modelName + model.twordsSuffix, model.twords, model.K, model.V, model.phi, model.data))
         return false
     }
     return true

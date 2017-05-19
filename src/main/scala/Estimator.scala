@@ -32,8 +32,9 @@ class Estimator {
     println("Sampling " + trnModel.niters + " iteration!")
 
     val lastIter = trnModel.liter
-    for (iter <- (lastIter + 1) until (trnModel.niters + lastIter)) {
-      println("Iteration " + iter + " ...")
+    val nextLastIter = trnModel.niters + lastIter
+    for (iter <- (lastIter + 1) to nextLastIter) {
+      println("Iteration " + iter + "...")
 
       // for all z_i
       for (m <- 0 until trnModel.M) {
@@ -47,11 +48,11 @@ class Estimator {
 
       trnModel.liter = iter
       if (savestep > 0) {
-        if (iter % savestep == 0) {
-          println("Saving the model at iteration " + iter + " ...")
+        if (iter % savestep == 0 && iter < nextLastIter) {
+          println("Saving the model at iteration " + iter + "...")
           computeTheta()
           computePhi()
-          Model2File.saveModel("model-" + Conversion.zeroPad(iter, 5), trnModel)
+          Model2File.saveModel(trnModel.modelName + "-" + Conversion.zeroPad(iter, 5), trnModel)
         }
       }
     } // end iterations	
@@ -60,8 +61,8 @@ class Estimator {
     System.out.println("Saving the final model!\n")
     computeTheta()
     computePhi()
-    trnModel.liter -= 1
-    Model2File.saveModel("model-final", trnModel)
+    //trnModel.liter -= 1
+    Model2File.saveModel(trnModel.modelName + "-final", trnModel)
   }
 
   /**

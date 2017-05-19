@@ -21,7 +21,7 @@ object Dictionary2File {
 
     //write word to id
     word2id.foreach(item => {
-      writer.write(item._2 + " " + item._1 + "\n")
+      writer.write(item._1 + " " + item._2 + "\n")
     })
 
     writer.close();
