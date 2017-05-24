@@ -5,15 +5,14 @@ import java.io.BufferedWriter
 import java.io.FileWriter
 import org.apache.spark.rdd.RDD
 
-object Dictionary2File {
+object WordMap2File {
   //---------------------------------------------------
   // I/O methods
   //---------------------------------------------------
   /**
    * write dictionary to file
    */
-  def writeWordMap(wordMapFile: String, word2idRDD: RDD[(String, Int)]): Boolean = {
-    val word2id = word2idRDD.collect()
+  def writeWordMap(wordMapFile: String, word2id: Map[String, Int]): Boolean = {
     val file = new File(wordMapFile)
     val writer = new BufferedWriter(new FileWriter(file))
     writer.flush

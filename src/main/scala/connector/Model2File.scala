@@ -2,26 +2,23 @@ package main.scala.connector
 
 import java.io.BufferedWriter
 import java.io.FileWriter
-import main.scala.obj.LDADataset
-import main.scala.obj.Model
 import java.io.File
-import main.scala.obj.LDADataset
 import scala.collection.mutable.ArrayBuffer
+import main.scala.obj.Document
 
 object Model2File {
 
   /**
    * Save word-topic assignments for this model
    */
-  def saveModelTAssign(filename: String, dataRDD: LDADataset, z: Array[Array[Int]]): Boolean = {
-    val docs = dataRDD.docs.collect()
+  def saveModelTAssign(filename: String, docs: Array[(Document, Long)], z: Array[ArrayBuffer[Int]]): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
     writer.flush
     //write docs with topic assignments for words
-    for (i <- 0 until dataRDD.M) {
-      /*for (j <- 0 until docs(i)._2.length) {
-        writer.write(docs(i)._2.words(j) + ":" + z(i)(j) + " ")
-      }*/
+    for (i <- 0 until docs.length) {
+      for (j <- 0 until docs(i)._1.length) {
+        writer.write(docs(i)._1.wordIndexes(j) + ":" + z(docs(i)._2.toInt)(j) + " ")
+      }
       writer.write("\n")
     }
     writer.close
@@ -82,7 +79,7 @@ object Model2File {
    * Save model the most likely words for each topic
    * Lay ra twords tu co phan bo xac suat cao nhat theo tung chu de
    */
-  def saveModelTwords(filename: String, twords: Int, K: Int, V: Int, phi: Array[Array[Double]], data: LDADataset): Boolean = {
+  def saveModelTwords(filename: String, twords: Int, K: Int, V: Int, phi: Array[Array[Double]], id2word: Map[Int, String]): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
     writer.flush
     val topwords = if (twords > V) V else twords
@@ -98,8 +95,8 @@ object Model2File {
       wordsProbsList = wordsProbsList.sortWith(_._2 > _._2)
 
       for (i <- 0 until topwords) {
-        if (data.localDict.contains(wordsProbsList(i)._1)) {
-          val word = data.localDict.getWord(wordsProbsList(i)._1)
+        if (id2word.contains(wordsProbsList(i)._1)) {
+          val word = id2word.get(wordsProbsList(i)._1).get
 
           writer.write("\t" + word + " " + wordsProbsList(i)._2 + "\n");
         }
@@ -113,27 +110,32 @@ object Model2File {
   /**
    * Save model
    */
-  def saveModel(modelName: String, model: Model): Boolean = {
-    /*if (!saveModelTAssign(model.dir + File.separator + "output" + File.separator + modelName + model.tassignSuffix, model.data, model.z)) {
+  def saveModel(outputDir: String, modelName: String, alpha: Double, beta: Double, K: Int, M: Int, V: Int, twords: Int, liter: Int, docs: Array[(Document, Long)], z: Array[ArrayBuffer[Int]], theta: Array[Array[Double]], phi: Array[Array[Double]], id2word: Map[Int, String]): Boolean = {
+    val tassignSuffix = ".tassign"
+    val othersSuffix = ".others"
+    val thetaSuffix = ".theta"
+    val phiSuffix = ".phi"
+    val twordsSuffix = ".twords"
+    if (!saveModelTAssign(outputDir + File.separator + modelName + tassignSuffix, docs, z)) {
       return false
     }
 
-    if (!saveModelOthers(model.dir + File.separator + "output" + File.separator + modelName + model.othersSuffix, model.alpha, model.beta, model.K, model.M, model.V, model.liter)) {
+    if (!saveModelOthers(outputDir + File.separator + modelName + othersSuffix, alpha, beta, K, M, V, liter)) {
       return false
     }
 
-    if (!saveModelTheta(model.dir + File.separator + "output" + File.separator + modelName + model.thetaSuffix, model.theta, model.M, model.K)) {
+    if (!saveModelTheta(outputDir + File.separator + modelName + thetaSuffix, theta, M, K)) {
       return false
     }
 
-    if (!saveModelPhi(model.dir + File.separator + "output" + File.separator + modelName + model.phiSuffix, model.phi, model.K, model.V)) {
+    if (!saveModelPhi(outputDir + File.separator + modelName + phiSuffix, phi, K, V)) {
       return false
     }
 
-    if (model.twords > 0) {
-      if (!saveModelTwords(model.dir + File.separator + "output" + File.separator + modelName + model.twordsSuffix, model.twords, model.K, model.V, model.phi, model.data))
+    if (twords > 0) {
+      if (!saveModelTwords(outputDir + File.separator + modelName + twordsSuffix, twords, K, V, phi, id2word))
         return false
-    }*/
+    }
     return true
   }
 }

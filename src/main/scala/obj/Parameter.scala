@@ -10,7 +10,7 @@ class Parameter {
   var K: Int = -1
   var niters: Int = -1
   var directory: String = "@"
-  //var datafile: String = "@"
+  var output: String = "@"
   var modelname: String = "@"
   var twords: Int = -1
   var wordMapFileName: String = "@"
@@ -29,6 +29,14 @@ class Parameter {
     directory = {
       if (cmd.hasOption("directory")) {
         var dir = cmd.getOptionValue("directory")
+        if (dir.last.toString == File.separator)
+          dir.substring(0, dir.length - 1)
+        else dir
+      } else "@"
+    }
+    output = {
+      if (cmd.hasOption("output")) {
+        var dir = cmd.getOptionValue("output")
         if (dir.last.toString == File.separator)
           dir.substring(0, dir.length - 1)
         else dir
