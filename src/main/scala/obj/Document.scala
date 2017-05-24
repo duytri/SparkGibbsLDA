@@ -4,17 +4,17 @@ import scala.collection.mutable.ArrayBuffer
 
 /**
  * Lop dai dien cho mot TAI LIEU
- * @param words Chua cac tu trong mot tai lieu (van ban)
+ * @param wordIndexes Chua cac tu (index trong tu dien) cua mot tai lieu (van ban)
  * @param rawStr Noi dung tho cua tai lieu
  * @param length So tu trong tai lieu do
  */
-class Document(var words: ArrayBuffer[Int], var rawStr: String, var length: Int) {
+class Document(var wordIndexes: ArrayBuffer[Int], var rawStr: String, var length: Int) {
   
   //----------------------------------------------------
 	// Other constructors
 	//----------------------------------------------------
   def this() = {
-    this(new ArrayBuffer[Int], "", 0)
+    this(null, "", 0)
   }
   
   def this(length: Int) = {

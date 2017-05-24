@@ -8,6 +8,7 @@ import main.scala.obj.LDADataset
 import scala.collection.mutable.ArrayBuffer
 import main.scala.obj.Document
 import main.scala.obj.Dictionary
+import org.apache.spark.SparkContext
 
 class File2Model {
   //---------------------------------------------------------------
@@ -68,13 +69,13 @@ class File2Model {
     true
   }
 
-  def readTAssignFile(tassignFile: String): Boolean = {
+  def readTAssignFile(sc: SparkContext, tassignFile: String): Boolean = {
     var i, j: Int = 0
     val reader = new BufferedReader(new FileReader(tassignFile))
 
     var line: String = ""
     z = new Array[Array[Int]](M)
-    data = new LDADataset(M)
+    data = new LDADataset(sc, M)
     data.V = V
     for (i <- 0 until M) {
       line = reader.readLine
@@ -114,15 +115,15 @@ class File2Model {
   /**
    * load saved model
    */
-  def loadModel(dir: String, modelName: String, othersSuffix: String, tassignSuffix: String, wordMapFile: String): Boolean = {
+  def loadModel(sc: SparkContext, dir: String, modelName: String, othersSuffix: String, tassignSuffix: String, wordMapFile: String): Boolean = {
     if (!readOthersFile(dir + File.separator + "output" + File.separator + modelName + othersSuffix))
       false
 
-    if (!readTAssignFile(dir + File.separator + "output" + File.separator + modelName + tassignSuffix))
+    if (!readTAssignFile(sc, dir + File.separator + "output" + File.separator + modelName + tassignSuffix))
       false
 
     // read dictionary
-    data.localDict = new Dictionary(File2Dictionary.readWordMap(dir + File.separator + "output" + File.separator + wordMapFile))
+    //data.localDict = new Dictionary(sc, File2Dictionary.readWordMap(dir + File.separator + "output" + File.separator + wordMapFile))
 
     true
   }

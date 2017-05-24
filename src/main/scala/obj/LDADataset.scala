@@ -3,6 +3,8 @@ package main.scala.obj
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Map
 import scala.collection.mutable.HashMap
+import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkContext
 
 /**
  * Kho chua du lieu cua LDA
@@ -13,21 +15,17 @@ import scala.collection.mutable.HashMap
  * @param lid2gid map from local coordinates (id) to global ones. Null if the global dictionary is not set
  * @param globalDict link to a global dictionary (optional), null for train data, not null for test data
  */
-class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var M: Int, var V: Int, var lid2gid: Map[Int, Int], var globalDict: Dictionary) {
+class LDADataset(val sc: SparkContext, var localDict: Dictionary, var docs: RDD[Document], var M: Int, var V: Int) {
 
   //--------------------------------------------------------------
   // Constructor
   //--------------------------------------------------------------
-  def this() = {
-    this(new Dictionary, new ArrayBuffer[Document], 0, 0, null, null)
+  def this(sc: SparkContext) = {
+    this(sc, new Dictionary(sc), sc.emptyRDD[Document], 0, 0)
   }
 
-  def this(M: Int) = {
-    this(new Dictionary, new ArrayBuffer[Document], M, 0, null, null)
-  }
-
-  def this(M: Int, globalDict: Dictionary) = {
-    this(new Dictionary, new ArrayBuffer[Document], M, 0, new HashMap[Int, Int], globalDict)
+  def this(sc: SparkContext, M: Int) = {
+    this(sc, new Dictionary(sc), sc.emptyRDD[Document], M, 0)
   }
 
   //-------------------------------------------------------------
@@ -40,48 +38,7 @@ class LDADataset(var localDict: Dictionary, var docs: ArrayBuffer[Document], var
    */
   def setDoc(doc: Document, idx: Int): Unit = {
     if (0 <= idx && idx < M) {
-      docs.insert(idx, doc)
-    }
-  }
-  /**
-   * set the document at the index idx if idx is greater than 0 and less than M
-   * @param content string contains doc
-   * @param idx index in the document array
-   */
-  def setDoc(content: String, idx: Int): Unit = {
-    //println(content)
-    if (0 <= idx && idx < M) {
-      var ids = new ArrayBuffer[Int]
-
-      content.split("[ \\t\\n]").foreach(word => {
-        var _id = localDict.word2id.size
-
-        if (localDict.contains(word))
-          _id = localDict.getId(word)
-
-        if (globalDict != null) {
-          //get the global id					
-          val id = globalDict.getId(word)
-          //println(id)
-
-          if (id != -1) {
-            localDict.addWord(word)
-
-            lid2gid.put(_id, id)
-            ids.append(_id)
-          } else { //not in global dictionary
-            //do nothing currently
-          }
-        } else {
-          localDict.addWord(word)
-          ids.append(_id)
-        }
-      })
-      
-      val doc = new Document(ids, content)
-      
-      docs.insert(idx, doc)
-      V = localDict.word2id.size
+      docs = docs ++ sc.parallelize(List(doc))
     }
   }
 }

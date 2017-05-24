@@ -8,22 +8,23 @@ import java.io.File
 import main.scala.connector.Model2File
 import main.scala.helper.Conversion
 import main.scala.obj.Parameter
+import org.apache.spark.SparkContext
 
 class Estimator {
   // output model
   var trnModel: Model = null
 
-  def init(isContinue: Boolean, params: Parameter): Boolean = {
+  def init(isContinue: Boolean, sc: SparkContext, params: Parameter): Boolean = {
     trnModel = new Model()
 
-    if (!isContinue) {
-      if (!trnModel.initNewModel(params))
+    /*if (!isContinue) {
+      if (!trnModel.initNewModel(sc, params))
         false
       Dictionary2File.writeWordMap(params.directory + File.separator + "output" + File.separator + params.wordMapFileName, trnModel.data.localDict.word2id)
     } else {
-      if (!trnModel.initEstimatedModel(params))
+      if (!trnModel.initEstimatedModel(sc, params))
         false
-    }
+    }*/
 
     true
   }
@@ -31,14 +32,14 @@ class Estimator {
   def estimate(savestep: Int): Unit = {
     println("Sampling " + trnModel.niters + " iteration!")
 
-    val lastIter = trnModel.liter
+    val lastIter = 0//trnModel.liter
     val nextLastIter = trnModel.niters + lastIter
     for (iter <- (lastIter + 1) to nextLastIter) {
       println("Iteration " + iter + "...")
 
       // for all z_i
       for (m <- 0 until trnModel.M) {
-        for (n <- 0 until trnModel.data.docs(m).length) {
+        for (n <- 0 until 3) { //trnModel.data.docs.take(m)(0)._2.length
           // z_i = z[m][n]
           // sample from p(z_i|z_-i, w)
           val topic = sampling(m, n)
@@ -46,15 +47,15 @@ class Estimator {
         } // end for each word
       } // end for each document
 
-      trnModel.liter = iter
-      if (savestep > 0) {
+      //trnModel.liter = iter
+      /*if (savestep > 0) {
         if (iter % savestep == 0 && iter < nextLastIter) {
           println("Saving the model at iteration " + iter + "...")
           computeTheta()
           computePhi()
           Model2File.saveModel(trnModel.modelName + "-" + Conversion.zeroPad(iter, 5), trnModel)
         }
-      }
+      }*/
     } // end iterations	
 
     System.out.println("Gibbs sampling completed!\n")
@@ -74,7 +75,7 @@ class Estimator {
   def sampling(m: Int, n: Int): Int = {
     // remove z_i from the count variable
     var topic = trnModel.z(m)(n)
-    val w = trnModel.data.docs(m).words(n)
+    val w = 0//trnModel.data.docs.take(m)(0)._2.words(n)
 
     trnModel.nw(w)(topic) -= 1
     trnModel.nd(m)(topic) -= 1

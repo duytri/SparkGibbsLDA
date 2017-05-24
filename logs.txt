@@ -1,0 +1,6 @@
+Current directory: /home/nguyenduy/spark
+#################### Gibbs sampling LDA in Apache Spark ####################
+Preparing...
+Number of tokens in this corpus: 195895
+Estimating...
+#################### Finished in 0 hour(s) 1 minute(s) 47 second(s) and 20 millisecond(s) ####################

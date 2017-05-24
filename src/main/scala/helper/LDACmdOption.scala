@@ -17,37 +17,37 @@ object LDACmdOption {
   help.setArgs(0)
   options.addOption(help)
 
-  val estimate = new Option("e", "estimate", true, "Specify whether we want to estimate model from scratch")
+  /*val estimate = new Option("e", "estimate", true, "Specify whether we want to estimate model from scratch")
   estimate.setRequired(false)
   estimate.setArgs(0)
-  options.addOption(estimate)
+  options.addOption(estimate)*/
   //var est = false
 
-  val estcontinue = new Option("ec", "estcon", true, "Specify whether we want to continue the last estimation")
+  /*val estcontinue = new Option("ec", "estcon", true, "Specify whether we want to continue the last estimation")
   estcontinue.setRequired(false)
   estcontinue.setArgs(0)
-  options.addOption(estcontinue)
+  options.addOption(estcontinue)*/
   //@Option(name = "-estc", usage = "Specify whether we want to continue the last estimation")
   //var estc = false
 
-  val inference = new Option("i", "inference", true, "Specify whether we want to do inference")
+  /*val inference = new Option("i", "inference", true, "Specify whether we want to do inference")
   inference.setRequired(false)
   inference.setArgs(0)
-  options.addOption(inference)
+  options.addOption(inference)*/
   //@Option(name = "-inf", usage = "Specify whether we want to do inference")
   //var inf = true
 
-  val directory = new Option("d", "directory", true, "Specify directory")
+  val directory = new Option("d", "directory", true, "Specify HDFS directory")
   directory.setRequired(false)
   directory.setArgName("folder")
   options.addOption(directory)
   //@Option(name = "-dir", usage = "Specify directory")
   //var dir = ""
 
-  val datafile = new Option("df", "datafile", true, "Specify data file")
+  /*val datafile = new Option("df", "datafile", true, "Specify data file")
   datafile.setRequired(false)
   datafile.setArgName("file")  
-  options.addOption(datafile)
+  options.addOption(datafile)*/
   //@Option(name = "-dfile", usage = "Specify data file")
   //var dfile = ""
 
@@ -86,10 +86,10 @@ object LDACmdOption {
   //@Option(name = "-niters", usage = "Specify the number of iterations")
   //var niters = 1000
 
-  val ss = new Option("s", "savestep", true, "Specify the number of steps to save the model since the last save")
+  /*val ss = new Option("s", "savestep", true, "Specify the number of steps to save the model since the last save")
   ss.setRequired(false)
   ss.setArgName("number")
-  options.addOption(ss)
+  options.addOption(ss)*/
   //@Option(name = "-savestep", usage = "Specify the number of steps to save the model since the last save")
   //var savestep = 100
 
@@ -100,10 +100,10 @@ object LDACmdOption {
   //@Option(name = "-twords", usage = "Specify the number of most likely words to be printed for each topic")
   //var twords = 100
 
-  val wd = new Option("wd", "withrawdata", true, "Specify whether we include raw data in the input")
+  /*val wd = new Option("wd", "withrawdata", true, "Specify whether we include raw data in the input")
   wd.setRequired(false)
   wd.setArgs(0)
-  options.addOption(wd)
+  options.addOption(wd)*/
   //@Option(name = "-withrawdata", usage = "Specify whether we include raw data in the input")
   //var withrawdata = false
 

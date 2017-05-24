@@ -3,7 +3,7 @@ package main.scala.connector
 import java.io.File
 import java.io.BufferedWriter
 import java.io.FileWriter
-import scala.collection.mutable.Map
+import org.apache.spark.rdd.RDD
 
 object Dictionary2File {
   //---------------------------------------------------
@@ -12,10 +12,11 @@ object Dictionary2File {
   /**
    * write dictionary to file
    */
-  def writeWordMap(wordMapFile: String, word2id: Map[String, Int]): Boolean = {
+  def writeWordMap(wordMapFile: String, word2idRDD: RDD[(String, Int)]): Boolean = {
+    val word2id = word2idRDD.collect()
     val file = new File(wordMapFile)
     val writer = new BufferedWriter(new FileWriter(file))
-    writer.flush()
+    writer.flush
     //write number of words
     writer.write(word2id.size + "\n")
 
@@ -24,7 +25,7 @@ object Dictionary2File {
       writer.write(item._1 + " " + item._2 + "\n")
     })
 
-    writer.close();
+    writer.close
     true
   }
 }

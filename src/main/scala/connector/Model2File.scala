@@ -13,13 +13,15 @@ object Model2File {
   /**
    * Save word-topic assignments for this model
    */
-  def saveModelTAssign(filename: String, data: LDADataset, z: Array[Array[Int]]): Boolean = {
+  def saveModelTAssign(filename: String, dataRDD: LDADataset, z: Array[Array[Int]]): Boolean = {
+    val docs = dataRDD.docs.collect()
     val writer = new BufferedWriter(new FileWriter(filename))
+    writer.flush
     //write docs with topic assignments for words
-    for (i <- 0 until data.M) {
-      for (j <- 0 until data.docs(i).length) {
-        writer.write(data.docs(i).words(j) + ":" + z(i)(j) + " ")
-      }
+    for (i <- 0 until dataRDD.M) {
+      /*for (j <- 0 until docs(i)._2.length) {
+        writer.write(docs(i)._2.words(j) + ":" + z(i)(j) + " ")
+      }*/
       writer.write("\n")
     }
     writer.close
@@ -31,6 +33,7 @@ object Model2File {
    */
   def saveModelTheta(filename: String, theta: Array[Array[Double]], M: Int, K: Int): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
+    writer.flush
     for (i <- 0 until M) {
       for (j <- 0 until K) {
         writer.write(theta(i)(j) + " ");
@@ -46,6 +49,7 @@ object Model2File {
    */
   def saveModelPhi(filename: String, phi: Array[Array[Double]], K: Int, V: Int): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
+    writer.flush
     for (i <- 0 until K) {
       for (j <- 0 until V) {
         writer.write(phi(i)(j) + " ");
@@ -61,6 +65,7 @@ object Model2File {
    */
   def saveModelOthers(filename: String, alpha: Double, beta: Double, K: Int, M: Int, V: Int, liter: Int): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
+    writer.flush
 
     writer.write("alpha=" + alpha + "\n");
     writer.write("beta=" + beta + "\n");
@@ -79,6 +84,7 @@ object Model2File {
    */
   def saveModelTwords(filename: String, twords: Int, K: Int, V: Int, phi: Array[Array[Double]], data: LDADataset): Boolean = {
     val writer = new BufferedWriter(new FileWriter(filename))
+    writer.flush
     val topwords = if (twords > V) V else twords
 
     for (k <- 0 until K) {
@@ -108,7 +114,7 @@ object Model2File {
    * Save model
    */
   def saveModel(modelName: String, model: Model): Boolean = {
-    if (!saveModelTAssign(model.dir + File.separator + "output" + File.separator + modelName + model.tassignSuffix, model.data, model.z)) {
+    /*if (!saveModelTAssign(model.dir + File.separator + "output" + File.separator + modelName + model.tassignSuffix, model.data, model.z)) {
       return false
     }
 
@@ -127,7 +133,7 @@ object Model2File {
     if (model.twords > 0) {
       if (!saveModelTwords(model.dir + File.separator + "output" + File.separator + modelName + model.twordsSuffix, model.twords, model.K, model.V, model.phi, model.data))
         return false
-    }
+    }*/
     return true
   }
 }

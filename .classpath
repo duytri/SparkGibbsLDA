@@ -3,6 +3,8 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="lib" path="libs/spark-core_2.11-2.1.1.jar"/>
+	<classpathentry kind="lib" path="libs/hadoop-common-2.7.3.jar"/>
 	<classpathentry kind="lib" path="libs/activation-1.1.1.jar"/>
 	<classpathentry kind="lib" path="libs/antlr-2.7.7.jar"/>
 	<classpathentry kind="lib" path="libs/antlr-runtime-3.4.jar"/>
@@ -30,6 +32,7 @@
 	<classpathentry kind="lib" path="libs/chill-java-0.8.0.jar"/>
 	<classpathentry kind="lib" path="libs/commons-beanutils-1.7.0.jar"/>
 	<classpathentry kind="lib" path="libs/commons-beanutils-core-1.8.0.jar"/>
+	<classpathentry kind="lib" path="libs/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="libs/commons-codec-1.10.jar"/>
 	<classpathentry kind="lib" path="libs/commons-collections-3.2.2.jar"/>
 	<classpathentry kind="lib" path="libs/commons-compiler-3.0.0.jar"/>
@@ -63,7 +66,6 @@
 	<classpathentry kind="lib" path="libs/hadoop-annotations-2.7.3.jar"/>
 	<classpathentry kind="lib" path="libs/hadoop-auth-2.7.3.jar"/>
 	<classpathentry kind="lib" path="libs/hadoop-client-2.7.3.jar"/>
-	<classpathentry kind="lib" path="libs/hadoop-common-2.7.3.jar"/>
 	<classpathentry kind="lib" path="libs/hadoop-hdfs-2.7.3.jar"/>
 	<classpathentry kind="lib" path="libs/hadoop-mapreduce-client-app-2.7.3.jar"/>
 	<classpathentry kind="lib" path="libs/hadoop-mapreduce-client-common-2.7.3.jar"/>
@@ -177,7 +179,6 @@
 	<classpathentry kind="lib" path="libs/snappy-0.2.jar"/>
 	<classpathentry kind="lib" path="libs/snappy-java-1.1.2.6.jar"/>
 	<classpathentry kind="lib" path="libs/spark-catalyst_2.11-2.1.1.jar"/>
-	<classpathentry kind="lib" path="libs/spark-core_2.11-2.1.1.jar"/>
 	<classpathentry kind="lib" path="libs/spark-graphx_2.11-2.1.1.jar"/>
 	<classpathentry kind="lib" path="libs/spark-hive_2.11-2.1.1.jar"/>
 	<classpathentry kind="lib" path="libs/spark-hive-thriftserver_2.11-2.1.1.jar"/>
