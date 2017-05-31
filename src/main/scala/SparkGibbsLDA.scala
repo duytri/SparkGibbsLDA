@@ -17,6 +17,9 @@ import main.scala.helper.OneDimDoubleAcc
 import main.scala.connector.WordMap2File
 import java.io.File
 import main.scala.connector.Model2File
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.Row
 
 object SparkGibbsLDA {
   def main(args: Array[String]): Unit = {
@@ -36,18 +39,17 @@ object SparkGibbsLDA {
           return
         } else {
           //~~~~~~~~~~~ Spark ~~~~~~~~~~~
-          val conf = new SparkConf().setAppName("SparkGibbsLDA").setMaster("local[8]")
-          val sc = new SparkContext(conf)
+          val conf = new SparkConf().setAppName("SparkGibbsLDA").setMaster("local[*]")
+          val spark = SparkSession.builder().config(conf).getOrCreate()
+          val sc = spark.sparkContext
           //~~~~~~~~~~~ Timer ~~~~~~~~~~~
           val startTime = System.currentTimeMillis()
 
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           //println("#################### DAY LA PHAN THAN CUA CHUONG TRINH ####################")
           println("Preparing...")
+          
           //~ Create model ~
-          val p = new OneDimDoubleAcc(params.K)
-          sc.register(p, "probability array")
-
           val setFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2 }.map(_.split("\n"))
           setFiles.cache()
           val M = setFiles.count().toInt // number of docs
@@ -58,7 +60,11 @@ object SparkGibbsLDA {
           val bcI2W = sc.broadcast(word2id.map(item => {
             item._2 -> item._1
           }))
-          val bcParams = sc.broadcast(params)
+
+          val bcK = sc.broadcast(params.K)
+          val bcV = sc.broadcast(V)
+          val bcAlpha = sc.broadcast(params.alpha)
+          val bcBeta = sc.broadcast(params.beta)
 
           val setDocs = setFiles.map(file => {
             var ids = new ArrayBuffer[Int]
@@ -79,92 +85,77 @@ object SparkGibbsLDA {
           sc.register(ndsum, "Total number of words in document")
 
           var z = new TwoDimIntAcc2(M)
-          sc.register(z)
+          sc.register(z, "Topic assignment")
 
-          setDocs.foreach(doc => {
-            val m = doc._2.toInt // index of document
-            val N = doc._1.wordIndexes.length // number of words in document
-            //initilize for z
-            z.initSecondDim(m, N)
-            for (n <- 0 until N) {
-              val topic = Math.floor(Math.random() * bcParams.value.K).toInt // topic j
-              z.setValue((m, n, topic))
-
-              // number of instances of word assigned to topic j
-              nw.add((doc._1.wordIndexes(n), topic, 1))
-              // number of words in document m assigned to topic j
-              nd.add((m, topic, 1))
-              // total number of words assigned to topic j
-              nwsum.add((topic, 1))
-            }
-            // total number of words in document m
-            ndsum.add((m, N))
-          })
-
-          //println("Number of tokens in this corpus: " + ndsum.value.reduce { _ + _ })
-
-          println("Estimating...")
-
-          val Vbeta = sc.broadcast(V * params.beta)
-          val Kalpha = sc.broadcast(params.K * params.alpha)
-          for (iter <- 0 until params.niters) {
-            // for all z_i
-            setDocs.foreach(doc => {
-              val m = doc._2.toInt // index of document
-              for (n <- 0 until doc._1.wordIndexes.length) {
-                // z_i = z[m][n]
-                // sample from p(z_i|z_-i, w)
-                val topic = {
-                  // remove z_i from the count variable
-                  var topic = z.value()(m)(n)
-                  val w = doc._1.wordIndexes(n)
-
-                  nw.subtract((w, topic, 1))
-                  nd.subtract((m, topic, 1))
-                  nwsum.subtract((topic, 1))
-                  ndsum.subtract((m, 1))
-
-                  //do multinominal sampling via cumulative method
-                  for (k <- 0 until bcParams.value.K) {
-                    p.set((k), (nw.value()(w)(k) + bcParams.value.beta) / (nwsum.value()(k) + Vbeta.value) *
-                      (nd.value()(m)(k) + bcParams.value.alpha) / (ndsum.value()(m) + Kalpha.value))
-                  }
-
-                  // cumulate multinomial parameters
-                  for (k <- 1 until bcParams.value.K) {
-                    p.add((k, p.value()(k - 1)))
-                  }
-
-                  // scaled sample because of unnormalized p[]
-                  val u = Math.random() * p.value()(bcParams.value.K - 1)
-
-                  //sample topic w.r.t distribution p
-                  topic = 0
-                  while (topic < bcParams.value.K && p.value()(topic) <= u) {
-                    topic += 1
-                  }
-                  if (topic == bcParams.value.K) topic -= 1
-
-                  // add newly estimated z_i to count variables
-                  nw.add((w, topic, 1))
-                  nd.add((m, topic, 1))
-                  nwsum.add((topic, 1))
-                  ndsum.add((m, 1))
-
-                  topic
-                }
+          setDocs.foreach {
+            case (doc: Document, id: Long) => {
+              val m = id.toInt // index of document
+              val N = doc.wordIndexes.length // number of words in document
+              //initilize for z
+              //z.initSecondDim(m, N)
+              for (n <- 0 until N) {
+                val topic = Math.floor(Math.random() * bcK.value).toInt // topic j
                 z.setValue((m, n, topic))
-              } // end for each word
-            }) // end for each document
-          } // end iterations	
+
+                // number of instances of word assigned to topic j
+                nw.add((doc.wordIndexes(n), topic, 1))
+                // number of words in document m assigned to topic j
+                nd.add((m, topic, 1))
+                // total number of words assigned to topic j
+                nwsum.add((topic, 1))
+              }
+              // total number of words in document m
+              ndsum.add((m, N))
+            }
+          }
+
+          val bcM = sc.broadcast(M)
+          val bcNW = sc.broadcast(nw.value)
+          val bcND = sc.broadcast(nd.value)
+          val bcNWSUM = sc.broadcast(nwsum.value)
+          val bcNDSUM = sc.broadcast(ndsum.value)
+          val bcZ = sc.broadcast(z.value)
+
+          var iterationData = setDocs.map(document => {
+            (document, bcNW.value, bcND.value, bcNWSUM.value, bcZ.value)
+          })
+          println("Estimating...")
+          for (iter <- 0 until params.niters) {
+            iterationData = iterationData.map {
+              case (document: (Document, Long), nw: Array[Array[Int]], nd: Array[Array[Int]], nwsum: Array[Int], z: Array[ArrayBuffer[Int]]) => {
+                var nwNew: Array[Array[Int]] = null
+                var ndNew: Array[Array[Int]] = null
+                var nwsumNew: Array[Int] = null
+                for (m <- 0 until bcM.value) {
+                  for (n <- 0 until document._1.wordIndexes.length) {
+                    val w = document._1.wordIndexes(n)
+                    var topic = z(m)(n)
+                    // z_i = z[m][n]
+                    // sample from p(z_i|z_-i, w)
+                    val results = sampling(m, w, topic, bcV.value, bcK.value, bcAlpha.value, bcBeta.value, nw, nd, nwsum, bcNDSUM.value)
+                    val topicNew = results._1
+                    nwNew = results._2
+                    ndNew = results._3
+                    nwsumNew = results._4
+                    z(m).update(n, topicNew)
+                  } // end for each word
+                } // end for each document
+
+                (document, nwNew, ndNew, nwsumNew, z)
+              }
+            }
+          }
+          
+          val results = iterationData.collect()
 
           var theta = computeTheta(M, params.K, params.alpha, nd.value, ndsum.value)
           var phi = computePhi(params.K, V, params.beta, nw.value, nwsum.value)
 
+          spark.stop()
           //~~~~~~~~~~~ Writing results ~~~~~~~~~~~
           if (!params.output.equals("@")) {
             WordMap2File.writeWordMap(params.output + File.separator + params.wordMapFileName, word2id)
-            Model2File.saveModel(params.output, params.modelname, params.alpha, params.beta, params.K, M, V, params.twords, params.niters-1, setDocs.collect(), z.value, theta, phi, bcI2W.value)
+            Model2File.saveModel(params.output, params.modelname, params.alpha, params.beta, params.K, M, V, params.twords, params.niters - 1, setDocs.collect(), z.value, theta, phi, bcI2W.value)
           }
 
           //~~~~~~~~~~~ Timer ~~~~~~~~~~~
@@ -193,6 +184,47 @@ object SparkGibbsLDA {
       }
       case e: Throwable => e.printStackTrace()
     }
+  }
+
+  def sampling(m: Int, w: Int, topic: Int, V: Int, K: Int, alpha: Double, beta: Double, nw: Array[Array[Int]], nd: Array[Array[Int]], nwsum: Array[Int], ndsum: Array[Int]): (Int, Array[Array[Int]], Array[Array[Int]], Array[Int]) = {
+
+    var p = Array.ofDim[Double](K)
+
+    nw(w)(topic) -= 1
+    nd(m)(topic) -= 1
+    nwsum(topic) -= 1
+
+    //do multinominal sampling via cumulative method
+    for (k <- 0 until K) {
+      p(k) = (nw(w)(k) + beta) / (nwsum(k) + V * beta) *
+        (nd(m)(k) + alpha) / (ndsum(m) - 1 + K * alpha)
+    }
+
+    // cumulate multinomial parameters
+    for (k <- 1 until K) {
+      p(k) += p(k - 1)
+    }
+
+    // scaled sample because of unnormalized p[]
+    val u = Math.random() * p(K - 1)
+
+    //sample topic w.r.t distribution p
+    var topicNew = 0
+    while (topicNew < K && p(topicNew) <= u) {
+      topicNew += 1
+    }
+    if (topicNew == K) topicNew -= 1
+    /*for (topic <- 0 until trnModel.K) {
+      if (trnModel.p(topic) > u) //sample topic w.r.t distribution p
+        break
+    }*/
+
+    // add newly estimated z_i to count variables
+    nw(w)(topicNew) += 1;
+    nd(m)(topicNew) += 1;
+    nwsum(topicNew) += 1;
+
+    (topicNew, nw, nd, nwsum)
   }
 
   def computeTheta(M: Int, K: Int, alpha: Double, nd: Array[Array[Int]], ndsum: Array[Int]): Array[Array[Double]] = {
