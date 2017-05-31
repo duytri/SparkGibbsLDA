@@ -12,8 +12,11 @@ object WordMap2File {
   /**
    * write dictionary to file
    */
-  def writeWordMap(wordMapFile: String, word2id: Map[String, Int]): Boolean = {
+  def writeWordMap(wordMapFile: String, word2id: Map[String, Int]): Unit = {
+    println("WordMap File: " + wordMapFile)
     val file = new File(wordMapFile)
+    file.getParentFile.mkdirs()
+    file.createNewFile
     val writer = new BufferedWriter(new FileWriter(file))
     writer.flush
     //write number of words
@@ -25,6 +28,5 @@ object WordMap2File {
     })
 
     writer.close
-    true
   }
 }

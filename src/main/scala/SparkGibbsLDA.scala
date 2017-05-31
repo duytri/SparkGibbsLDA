@@ -18,8 +18,6 @@ import main.scala.connector.WordMap2File
 import java.io.File
 import main.scala.connector.Model2File
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.Row
 
 object SparkGibbsLDA {
   def main(args: Array[String]): Unit = {
@@ -48,7 +46,7 @@ object SparkGibbsLDA {
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           //println("#################### DAY LA PHAN THAN CUA CHUONG TRINH ####################")
           println("Preparing...")
-          
+
           //~ Create model ~
           val setFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2 }.map(_.split("\n"))
           setFiles.cache()
@@ -92,7 +90,7 @@ object SparkGibbsLDA {
               val m = id.toInt // index of document
               val N = doc.wordIndexes.length // number of words in document
               //initilize for z
-              //z.initSecondDim(m, N)
+              z.initSecondDim(m, N)
               for (n <- 0 until N) {
                 val topic = Math.floor(Math.random() * bcK.value).toInt // topic j
                 z.setValue((m, n, topic))
@@ -126,38 +124,35 @@ object SparkGibbsLDA {
                 var nwNew: Array[Array[Int]] = null
                 var ndNew: Array[Array[Int]] = null
                 var nwsumNew: Array[Int] = null
-                for (m <- 0 until bcM.value) {
-                  for (n <- 0 until document._1.wordIndexes.length) {
-                    val w = document._1.wordIndexes(n)
-                    var topic = z(m)(n)
-                    // z_i = z[m][n]
-                    // sample from p(z_i|z_-i, w)
-                    val results = sampling(m, w, topic, bcV.value, bcK.value, bcAlpha.value, bcBeta.value, nw, nd, nwsum, bcNDSUM.value)
-                    val topicNew = results._1
-                    nwNew = results._2
-                    ndNew = results._3
-                    nwsumNew = results._4
-                    z(m).update(n, topicNew)
-                  } // end for each word
-                } // end for each document
-
+                val m = document._2.toInt
+                for (n <- 0 until document._1.wordIndexes.length) {
+                  val w = document._1.wordIndexes(n)
+                  var topic = z(m)(n)
+                  // z_i = z[m][n]
+                  // sample from p(z_i|z_-i, w)
+                  val results = sampling(m, w, topic, bcV.value, bcK.value, bcAlpha.value, bcBeta.value, nw, nd, nwsum, bcNDSUM.value)
+                  val topicNew = results._1
+                  nwNew = results._2
+                  ndNew = results._3
+                  nwsumNew = results._4
+                  z(m).update(n, topicNew)
+                } // end for each word
                 (document, nwNew, ndNew, nwsumNew, z)
-              }
+              } // end for each document
             }
           }
-          
+
           val results = iterationData.collect()
 
           var theta = computeTheta(M, params.K, params.alpha, nd.value, ndsum.value)
           var phi = computePhi(params.K, V, params.beta, nw.value, nwsum.value)
-
-          spark.stop()
           //~~~~~~~~~~~ Writing results ~~~~~~~~~~~
           if (!params.output.equals("@")) {
             WordMap2File.writeWordMap(params.output + File.separator + params.wordMapFileName, word2id)
             Model2File.saveModel(params.output, params.modelname, params.alpha, params.beta, params.K, M, V, params.twords, params.niters - 1, setDocs.collect(), z.value, theta, phi, bcI2W.value)
           }
 
+          spark.stop()
           //~~~~~~~~~~~ Timer ~~~~~~~~~~~
           val duration = System.currentTimeMillis() - startTime
           val millis = (duration % 1000).toInt

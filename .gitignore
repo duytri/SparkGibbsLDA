@@ -2,3 +2,5 @@
 /target/
 /project/
 .cache-main
+/libs/
+/output/

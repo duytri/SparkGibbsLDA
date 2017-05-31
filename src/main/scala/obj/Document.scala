@@ -8,7 +8,7 @@ import scala.collection.mutable.ArrayBuffer
  * @param rawStr Noi dung tho cua tai lieu
  * @param length So tu trong tai lieu do
  */
-class Document(var wordIndexes: ArrayBuffer[Int], var rawStr: String, var length: Int) {
+class Document(var wordIndexes: ArrayBuffer[Int], var rawStr: String, var length: Int) extends Serializable {
   
   //----------------------------------------------------
 	// Other constructors
