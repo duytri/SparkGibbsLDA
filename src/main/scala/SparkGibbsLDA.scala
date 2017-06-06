@@ -9,17 +9,15 @@ import main.java.commons.cli.UnrecognizedOptionException
 import main.scala.obj.Parameter
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
-import scala.collection.mutable.ArrayBuffer
-import main.scala.helper.TwoDimIntAcc
-import main.scala.helper.OneDimIntAcc
-import main.scala.helper.TwoDimIntAcc2
-import main.scala.helper.OneDimDoubleAcc
-import main.scala.connector.WordMap2File
 import java.io.File
-import main.scala.connector.Model2File
 import org.apache.spark.sql.SparkSession
+import breeze.linalg.Vector
+import org.apache.spark.mllib.linalg.Vectors
+import main.scala.obj.LDA
+import scala.collection.mutable.ArrayBuffer
 
 object SparkGibbsLDA {
+
   def main(args: Array[String]): Unit = {
     println("Current directory: " + System.getProperty("user.dir"))
     println("#################### Gibbs sampling LDA in Apache Spark ####################")
@@ -45,111 +43,31 @@ object SparkGibbsLDA {
 
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           //println("#################### DAY LA PHAN THAN CUA CHUONG TRINH ####################")
-          println("Preparing...")
-
-          //~ Create model ~
-          val setFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2 }.map(_.split("\n"))
-          setFiles.cache()
-          val M = setFiles.count().toInt // number of docs
-          val vocab = setFiles.flatMap(x => x).distinct()
+          val dataFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2 }.map(_.split("\n"))
+          val vocab = dataFiles.flatMap(x => x).distinct()
           val word2id = vocab.collect().zipWithIndex.toMap
-          val V = word2id.size // number of vocabulary
-          val bcW2I = sc.broadcast(word2id)
-          val bcI2W = sc.broadcast(word2id.map(item => {
-            item._2 -> item._1
-          }))
-
-          val bcK = sc.broadcast(params.K)
-          val bcV = sc.broadcast(V)
-          val bcAlpha = sc.broadcast(params.alpha)
-          val bcBeta = sc.broadcast(params.beta)
-
-          val setDocs = setFiles.map(file => {
-            var ids = new ArrayBuffer[Int]
+          val bcWord2Id = sc.broadcast(word2id)
+          val data = dataFiles.map(file => {
+            var ids = new ArrayBuffer[Double]
             file.foreach(word => {
-              ids.append(bcW2I.value.get(word).get)
+              ids.append(bcWord2Id.value.get(word).get)
             })
-            new Document(ids)
-          }).zipWithIndex
-          setDocs.cache()
-
-          var nw = new TwoDimIntAcc(V, params.K)
-          var nd = new TwoDimIntAcc(M, params.K)
-          var nwsum = new OneDimIntAcc(params.K)
-          var ndsum = new OneDimIntAcc(M)
-          sc.register(nw, "Number of words assigned to topic")
-          sc.register(nd, "Number of words in document assigned to topic")
-          sc.register(nwsum, "Total number of words assigned to topic")
-          sc.register(ndsum, "Total number of words in document")
-
-          var z = new TwoDimIntAcc2(M)
-          sc.register(z, "Topic assignment")
-
-          setDocs.foreach {
-            case (doc: Document, id: Long) => {
-              val m = id.toInt // index of document
-              val N = doc.wordIndexes.length // number of words in document
-              //initilize for z
-              z.initSecondDim(m, N)
-              for (n <- 0 until N) {
-                val topic = Math.floor(Math.random() * bcK.value).toInt // topic j
-                z.setValue((m, n, topic))
-
-                // number of instances of word assigned to topic j
-                nw.add((doc.wordIndexes(n), topic, 1))
-                // number of words in document m assigned to topic j
-                nd.add((m, topic, 1))
-                // total number of words assigned to topic j
-                nwsum.add((topic, 1))
-              }
-              // total number of words in document m
-              ndsum.add((m, N))
-            }
-          }
-
-          val bcM = sc.broadcast(M)
-          val bcNW = sc.broadcast(nw.value)
-          val bcND = sc.broadcast(nd.value)
-          val bcNWSUM = sc.broadcast(nwsum.value)
-          val bcNDSUM = sc.broadcast(ndsum.value)
-          val bcZ = sc.broadcast(z.value)
-
-          var iterationData = setDocs.map(document => {
-            (document, bcNW.value, bcND.value, bcNWSUM.value, bcZ.value)
+            ids.toArray
           })
-          println("Estimating...")
-          for (iter <- 0 until params.niters) {
-            iterationData = iterationData.map {
-              case (document: (Document, Long), nw: Array[Array[Int]], nd: Array[Array[Int]], nwsum: Array[Int], z: Array[ArrayBuffer[Int]]) => {
-                var nwNew: Array[Array[Int]] = null
-                var ndNew: Array[Array[Int]] = null
-                var nwsumNew: Array[Int] = null
-                val m = document._2.toInt
-                for (n <- 0 until document._1.wordIndexes.length) {
-                  val w = document._1.wordIndexes(n)
-                  var topic = z(m)(n)
-                  // z_i = z[m][n]
-                  // sample from p(z_i|z_-i, w)
-                  val results = sampling(m, w, topic, bcV.value, bcK.value, bcAlpha.value, bcBeta.value, nw, nd, nwsum, bcNDSUM.value)
-                  val topicNew = results._1
-                  nwNew = results._2
-                  ndNew = results._3
-                  nwsumNew = results._4
-                  z(m).update(n, topicNew)
-                } // end for each word
-                (document, nwNew, ndNew, nwsumNew, z)
-              } // end for each document
-            }
-          }
+          val parsedData = data.map(Vectors.dense(_))
+          // Index documents with unique IDs
+          val corpus = parsedData.zipWithIndex.map(_.swap).cache()
 
-          val results = iterationData.collect()
+          // Cluster the documents into three topics using LDA
+          val ldaModel = new LDA().setK(params.K).run(corpus, params.niters)
 
-          var theta = computeTheta(M, params.K, params.alpha, nd.value, ndsum.value)
-          var phi = computePhi(params.K, V, params.beta, nw.value, nwsum.value)
-          //~~~~~~~~~~~ Writing results ~~~~~~~~~~~
-          if (!params.output.equals("@")) {
-            WordMap2File.writeWordMap(params.output + File.separator + params.wordMapFileName, word2id)
-            Model2File.saveModel(params.output, params.modelname, params.alpha, params.beta, params.K, M, V, params.twords, params.niters - 1, setDocs.collect(), z.value, theta, phi, bcI2W.value)
+          // Output topics. Each is a distribution over words (matching word count vectors)
+          println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize + " words):")
+          val topics = ldaModel.topicsMatrix
+          for (topic <- Range(0, params.K)) {
+            print("Topic " + topic + ":")
+            for (word <- Range(0, ldaModel.vocabSize)) { print(" " + topics(word, topic)); }
+            println()
           }
 
           spark.stop()
