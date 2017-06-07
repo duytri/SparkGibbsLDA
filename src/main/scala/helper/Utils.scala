@@ -1,10 +1,16 @@
 package main.scala.helper
 
 import breeze.linalg.{ max, sum, DenseMatrix => BDM, DenseVector => BDV, CSCMatrix => BSM, Matrix => BM, SparseVector => BSV, Vector => BV }
-import org.apache.spark.mllib.linalg.{ Matrix, Vector }
 import breeze.numerics._
 import scala.util.Random
 import org.apache.spark.mllib.linalg.{ DenseMatrix, SparseMatrix, DenseVector, SparseVector }
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.feature.{ CountVectorizer, CountVectorizerModel, RegexTokenizer }
+import org.apache.spark.ml.linalg.{ Vector => MLVector }
+import org.apache.spark.mllib.linalg.{ Matrix, Vector, Vectors }
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{ Row, SparkSession }
+import org.apache.spark.SparkContext
 
 object Utils {
   /**
@@ -81,5 +87,47 @@ object Utils {
   def nextLong(): Long = {
     val random = new Random
     random.nextLong()
+  }
+
+  /**
+   * Load documents, tokenize them, create vocabulary, and prepare documents as term count vectors.
+   * @return (corpus, vocabulary as array, total token count in corpus)
+   */
+  def preprocess(
+    sc: SparkContext,
+    paths: String): (RDD[(Long, Vector)], Array[String], Long) = {
+
+    val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
+    import spark.implicits._
+
+    // Get dataset of document texts
+    // One document in each text file. If the input consists of many small files,
+    // this can result in a large number of small partitions, which can degrade performance.
+    // In this case, consider using coalesce() to create fewer, larger partitions.
+    val df = sc.wholeTextFiles(paths).map(_._2.trim).toDF("docs")
+
+    val tokenizer = new RegexTokenizer()
+      .setInputCol("docs")
+      .setOutputCol("tokens")
+
+    val countVectorizer = new CountVectorizer()
+      .setInputCol("tokens")
+      .setOutputCol("features")
+    //.setVocabSize(vocabSize)
+
+    val pipeline = new Pipeline()
+      .setStages(Array(tokenizer, countVectorizer))
+
+    val model = pipeline.fit(df)
+    val documents = model.transform(df)
+      .select("features")
+      .rdd
+      .map { case Row(features: MLVector) => Vectors.fromML(features) }
+      .zipWithIndex()
+      .map(_.swap)
+
+    (documents,
+      model.stages(1).asInstanceOf[CountVectorizerModel].vocabulary, // vocabulary
+      documents.map(_._2.numActives).sum().toLong) // total token count
   }
 }

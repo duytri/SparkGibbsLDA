@@ -97,7 +97,7 @@ object LDA {
     val gamma_wj = new Array[Double](K)
     var k = 0
     while (k < K) {
-      val gamma_wjk = (N_w(k) + eta) * (N_j(k) + alpha) / (N(k) + Weta)
+      val gamma_wjk = (N_w(k)-1 + eta) * (N_j(k)-1 + alpha) / (N(k)-1 + Weta)
       gamma_wj(k) = gamma_wjk
       sum += gamma_wjk
       k += 1
@@ -330,7 +330,7 @@ class LDA private (
    * @param maxIterations maximum iterations of LDA
    * @return  Inferred LDA model
    */
-  def run(documents: RDD[(Long, Vector)], maxIterations: Int): Model = {
+  def run(documents: RDD[(Long, Vector)]): LDAModel = {
     val state = ldaOptimizer.initialize(documents, this)
     var iter = 0
     val iterationTimes = Array.fill[Double](maxIterations)(0)

@@ -49,7 +49,7 @@ abstract class Model {
    * Shape parameter for random initialization of variational parameter gamma.
    * Used for variational inference for perplexity and other test-time computations.
    */
-  protected def gammaShape: Double
+  //protected def gammaShape: Double
 
   /**
    * Inferred topics, where each topic is represented by a distribution over terms.
@@ -92,7 +92,6 @@ class LDAModel(
   override val docConcentration: Vector,
   override val topicConcentration: Double,
   val iterationTimes: Array[Double],
-  val gammaShape: Double = LDAModel.defaultGammaShape,
   val checkpointFiles: Array[String] = Array.empty[String])
     extends Model {
 
@@ -247,15 +246,15 @@ class LDAModel(
     // TODO: generalize this for asymmetric (non-scalar) alpha
     val alpha = this.docConcentration(0) // To avoid closure capture of enclosing object
     val eta = this.topicConcentration
-    assert(eta > 1.0)
-    assert(alpha > 1.0)
+    //assert(eta > 1.0)
+    //assert(alpha > 1.0)
     val N_k = globalTopicTotals
-    val smoothed_N_k: TopicCounts = N_k + (vocabSize * (eta - 1.0))
+    val smoothed_N_k: TopicCounts = N_k + (vocabSize * eta)
     // Edges: Compute token log probability from phi_{wk}, theta_{kj}.
     val sendMsg: EdgeContext[TopicCounts, TokenCount, Double] => Unit = (edgeContext) => {
       val N_wj = edgeContext.attr
-      val smoothed_N_wk: TopicCounts = edgeContext.dstAttr + (eta - 1.0)
-      val smoothed_N_kj: TopicCounts = edgeContext.srcAttr + (alpha - 1.0)
+      val smoothed_N_wk: TopicCounts = edgeContext.dstAttr + eta //(eta - 1.0)
+      val smoothed_N_kj: TopicCounts = edgeContext.srcAttr + alpha //(alpha - 1.0)
       val phi_wk: TopicCounts = smoothed_N_wk :/ smoothed_N_k
       val theta_kj: TopicCounts = normalize(smoothed_N_kj, 1.0)
       val tokenLogLikelihood = N_wj * math.log(phi_wk.dot(theta_kj))
@@ -330,156 +329,4 @@ class LDAModel(
         (docID.toLong, topIndices.toArray, weights.toArray)
     }
   }
-
-  // TODO:
-  // override def topicDistributions(documents: RDD[(Long, Vector)]): RDD[(Long, Vector)] = ???
-
-  //override protected def formatVersion = "1.0"
-
-  /*override def save(sc: SparkContext, path: String): Unit = {
-    // Note: This intentionally does not save checkpointFiles.
-    LDAModel.SaveLoadV1_0.save(
-      sc, path, graph, globalTopicTotals, k, vocabSize, docConcentration, topicConcentration,
-      iterationTimes, gammaShape)
-  }*/
-}
-
-/**
- * Distributed model fitted by [[LDA]].
- * This type of model is currently only produced by Expectation-Maximization (EM).
- *
- * This model stores the inferred topics, the full training dataset, and the topic distribution
- * for each training document.
- */
-object LDAModel {
-
-  /**
-   * The [[LDAModel]] constructor's default arguments assume gammaShape = 100
-   * to ensure equivalence in LDAModel.toLocal conversion.
-   */
-  val defaultGammaShape: Double = 100
-
-  private object SaveLoadV1_0 {
-
-    val thisFormatVersion = "1.0"
-
-    val thisClassName = "org.apache.spark.mllib.clustering.LDAModel"
-
-    // Store globalTopicTotals as a Vector.
-    case class Data(globalTopicTotals: Vector)
-
-    // Store each term and document vertex with an id and the topicWeights.
-    case class VertexData(id: Long, topicWeights: Vector)
-
-    // Store each edge with the source id, destination id and tokenCounts.
-    case class EdgeData(srcId: Long, dstId: Long, tokenCounts: Double)
-
-    /*def save(
-      sc: SparkContext,
-      path: String,
-      graph: Graph[LDA.TopicCounts, LDA.TokenCount],
-      globalTopicTotals: LDA.TopicCounts,
-      k: Int,
-      vocabSize: Int,
-      docConcentration: Vector,
-      topicConcentration: Double,
-      iterationTimes: Array[Double],
-      gammaShape: Double): Unit = {
-      val spark = SparkSession.builder().config(sc.getConf).getOrCreate()
-
-      val metadata = compact(render(("class" -> thisClassName) ~ ("version" -> thisFormatVersion) ~
-        ("k" -> k) ~ ("vocabSize" -> vocabSize) ~
-        ("docConcentration" -> docConcentration.toArray.toSeq) ~
-        ("topicConcentration" -> topicConcentration) ~
-        ("iterationTimes" -> iterationTimes.toSeq) ~
-        ("gammaShape" -> gammaShape)))
-      sc.parallelize(Seq(metadata), 1).saveAsTextFile(Loader.metadataPath(path))
-
-      val newPath = new Path(Loader.dataPath(path), "globalTopicTotals").toUri.toString
-      spark.createDataFrame(Seq(Data(Utils.vectorFromBreeze(globalTopicTotals)))).write.parquet(newPath)
-
-      val verticesPath = new Path(Loader.dataPath(path), "topicCounts").toUri.toString
-      spark.createDataFrame(graph.vertices.map {
-        case (ind, vertex) =>
-          VertexData(ind, Utils.vectorFromBreeze(vertex))
-      }).write.parquet(verticesPath)
-
-      val edgesPath = new Path(Loader.dataPath(path), "tokenCounts").toUri.toString
-      spark.createDataFrame(graph.edges.map {
-        case Edge(srcId, dstId, prop) =>
-          EdgeData(srcId, dstId, prop)
-      }).write.parquet(edgesPath)
-    }
-
-    def load(
-      sc: SparkContext,
-      path: String,
-      vocabSize: Int,
-      docConcentration: Vector,
-      topicConcentration: Double,
-      iterationTimes: Array[Double],
-      gammaShape: Double): LDAModel = {
-      val dataPath = new Path(Loader.dataPath(path), "globalTopicTotals").toUri.toString
-      val vertexDataPath = new Path(Loader.dataPath(path), "topicCounts").toUri.toString
-      val edgeDataPath = new Path(Loader.dataPath(path), "tokenCounts").toUri.toString
-      val spark = SparkSession.builder().conf(sc.getConf).getOrCreate()
-      val dataFrame = spark.read.parquet(dataPath)
-      val vertexDataFrame = spark.read.parquet(vertexDataPath)
-      val edgeDataFrame = spark.read.parquet(edgeDataPath)
-
-      Loader.checkSchema[Data](dataFrame.schema)
-      Loader.checkSchema[VertexData](vertexDataFrame.schema)
-      Loader.checkSchema[EdgeData](edgeDataFrame.schema)
-      val globalTopicTotals: LDA.TopicCounts =
-        dataFrame.first().getAs[Vector](0).asBreeze.toDenseVector
-      val vertices: RDD[(VertexId, LDA.TopicCounts)] = vertexDataFrame.rdd.map {
-        case Row(ind: Long, vec: Vector) => (ind, vec.asBreeze.toDenseVector)
-      }
-
-      val edges: RDD[Edge[LDA.TokenCount]] = edgeDataFrame.rdd.map {
-        case Row(srcId: Long, dstId: Long, prop: Double) => Edge(srcId, dstId, prop)
-      }
-      val graph: Graph[LDA.TopicCounts, LDA.TokenCount] = Graph(vertices, edges)
-
-      new LDAModel(graph, globalTopicTotals, globalTopicTotals.length, vocabSize,
-        docConcentration, topicConcentration, iterationTimes, gammaShape)
-    }
-
-  }
-
-  override def load(sc: SparkContext, path: String): LDAModel = {
-    val (loadedClassName, loadedVersion, metadata) = Loader.loadMetadata(sc, path)
-    implicit val formats = DefaultFormats
-    val expectedK = (metadata \ "k").extract[Int]
-    val vocabSize = (metadata \ "vocabSize").extract[Int]
-    val docConcentration =
-      Vectors.dense((metadata \ "docConcentration").extract[Seq[Double]].toArray)
-    val topicConcentration = (metadata \ "topicConcentration").extract[Double]
-    val iterationTimes = (metadata \ "iterationTimes").extract[Seq[Double]]
-    val gammaShape = (metadata \ "gammaShape").extract[Double]
-    val classNameV1_0 = SaveLoadV1_0.thisClassName
-
-    val model = (loadedClassName, loadedVersion) match {
-      case (className, "1.0") if className == classNameV1_0 =>
-        LDAModel.SaveLoadV1_0.load(sc, path, vocabSize, docConcentration,
-          topicConcentration, iterationTimes.toArray, gammaShape)
-      case _ => throw new Exception(
-        s"LDAModel.load did not recognize model with (className, format version):" +
-          s"($loadedClassName, $loadedVersion).  Supported: ($classNameV1_0, 1.0)")
-    }
-
-    require(model.vocabSize == vocabSize,
-      s"LDAModel requires $vocabSize vocabSize, got ${model.vocabSize} vocabSize")
-    require(model.docConcentration == docConcentration,
-      s"LDAModel requires $docConcentration docConcentration, " +
-        s"got ${model.docConcentration} docConcentration")
-    require(model.topicConcentration == topicConcentration,
-      s"LDAModel requires $topicConcentration docConcentration, " +
-        s"got ${model.topicConcentration} docConcentration")
-    require(expectedK == model.k,
-      s"LDAModel requires $expectedK topics, got ${model.k} topics")
-    model
-  }*/
-  }
-
 }

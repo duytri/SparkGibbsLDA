@@ -15,6 +15,8 @@ import breeze.linalg.Vector
 import org.apache.spark.mllib.linalg.Vectors
 import main.scala.obj.LDA
 import scala.collection.mutable.ArrayBuffer
+import main.scala.helper.Utils
+import main.scala.obj.LDAModel
 
 object SparkGibbsLDA {
 
@@ -38,12 +40,10 @@ object SparkGibbsLDA {
           val conf = new SparkConf().setAppName("SparkGibbsLDA").setMaster("local[*]")
           val spark = SparkSession.builder().config(conf).getOrCreate()
           val sc = spark.sparkContext
-          //~~~~~~~~~~~ Timer ~~~~~~~~~~~
-          val startTime = System.currentTimeMillis()
-
+          
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           //println("#################### DAY LA PHAN THAN CUA CHUONG TRINH ####################")
-          val dataFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2 }.map(_.split("\n"))
+          /*val dataFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2.trim }.map(_.split("\n"))
           val vocab = dataFiles.flatMap(x => x).distinct()
           val word2id = vocab.collect().zipWithIndex.toMap
           val bcWord2Id = sc.broadcast(word2id)
@@ -53,31 +53,70 @@ object SparkGibbsLDA {
               ids.append(bcWord2Id.value.get(word).get)
             })
             ids.toArray
-          })
-          val parsedData = data.map(Vectors.dense(_))
+          })*/*/
+          //val parsedData = data.map(Vectors.dense(_))
           // Index documents with unique IDs
-          val corpus = parsedData.zipWithIndex.map(_.swap).cache()
+          //val corpus = parsedData.zipWithIndex.map(_.swap).cache()
+
+          // Load documents, and prepare them for LDA.
+          val preprocessStart = System.nanoTime()
+          val (corpus, vocabArray, actualNumTokens) = Utils.preprocess(sc, params.directory + "/*")
+          corpus.cache()
+          val actualCorpusSize = corpus.count()
+          val actualVocabSize = vocabArray.length
+          val preprocessElapsed = (System.nanoTime() - preprocessStart) / 1e9
+
+          println()
+          println(s"Corpus summary:")
+          println(s"\t Training set size: $actualCorpusSize documents")
+          println(s"\t Vocabulary size: $actualVocabSize terms")
+          println(s"\t Training set size: $actualNumTokens tokens")
+          println(s"\t Preprocessing time: $preprocessElapsed sec")
+          println()
 
           // Cluster the documents into three topics using LDA
-          val ldaModel = new LDA().setK(params.K).run(corpus, params.niters)
+          val lda = new LDA()
+            .setK(params.K)
+            .setAlpha(params.alpha)
+            .setBeta(params.beta)
+            .setMaxIterations(params.niters)
 
-          // Output topics. Each is a distribution over words (matching word count vectors)
-          println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize + " words):")
-          val topics = ldaModel.topicsMatrix
-          for (topic <- Range(0, params.K)) {
-            print("Topic " + topic + ":")
-            for (word <- Range(0, ldaModel.vocabSize)) { print(" " + topics(word, topic)); }
+          val startTime = System.nanoTime()
+          val ldaModel = lda.run(corpus)
+          val elapsed = (System.nanoTime() - startTime) / 1e6
+
+          println(s"Finished training LDA model.  Summary:")
+          val millis = (elapsed % 1000).toInt
+          val seconds = ((elapsed / 1000) % 60).toInt
+          val minutes = ((elapsed / (1000 * 60)) % 60).toInt
+          val hours = ((elapsed / (1000 * 60 * 60)) % 24).toInt
+          println(s"\t Training time: $hours hour(s) $minutes minute(s) $seconds second(s) and $millis milliseconds")
+
+          if (ldaModel.isInstanceOf[LDAModel]) {
+            val distLDAModel = ldaModel.asInstanceOf[LDAModel]
+            val avgLogLikelihood = distLDAModel.logLikelihood / actualCorpusSize.toDouble
+            println(s"\t Training data average log likelihood: $avgLogLikelihood")
             println()
           }
 
+          // Print the topics, showing the top-weighted terms for each topic.
+          val topicIndices = ldaModel.describeTopics(params.twords)
+          val topics = topicIndices.map {
+            case (terms, termWeights) =>
+              terms.zip(termWeights).map { case (term, weight) => (vocabArray(term.toInt), weight) }
+          }
+          println(s"${params.K} topics:")
+          topics.zipWithIndex.foreach {
+            case (topic, i) =>
+              println(s"TOPIC $i")
+              topic.foreach {
+                case (term, weight) =>
+                  println(s"$term\t$weight")
+              }
+              println()
+          }
+
           spark.stop()
-          //~~~~~~~~~~~ Timer ~~~~~~~~~~~
-          val duration = System.currentTimeMillis() - startTime
-          val millis = (duration % 1000).toInt
-          val seconds = ((duration / 1000) % 60).toInt
-          val minutes = ((duration / (1000 * 60)) % 60).toInt
-          val hours = ((duration / (1000 * 60 * 60)) % 24).toInt
-          println("#################### Finished in " + hours + " hour(s) " + minutes + " minute(s) " + seconds + " second(s) and " + millis + " millisecond(s) ####################")
         }
       }
     } catch {
@@ -97,66 +136,5 @@ object SparkGibbsLDA {
       }
       case e: Throwable => e.printStackTrace()
     }
-  }
-
-  def sampling(m: Int, w: Int, topic: Int, V: Int, K: Int, alpha: Double, beta: Double, nw: Array[Array[Int]], nd: Array[Array[Int]], nwsum: Array[Int], ndsum: Array[Int]): (Int, Array[Array[Int]], Array[Array[Int]], Array[Int]) = {
-
-    var p = Array.ofDim[Double](K)
-
-    nw(w)(topic) -= 1
-    nd(m)(topic) -= 1
-    nwsum(topic) -= 1
-
-    //do multinominal sampling via cumulative method
-    for (k <- 0 until K) {
-      p(k) = (nw(w)(k) + beta) / (nwsum(k) + V * beta) *
-        (nd(m)(k) + alpha) / (ndsum(m) - 1 + K * alpha)
-    }
-
-    // cumulate multinomial parameters
-    for (k <- 1 until K) {
-      p(k) += p(k - 1)
-    }
-
-    // scaled sample because of unnormalized p[]
-    val u = Math.random() * p(K - 1)
-
-    //sample topic w.r.t distribution p
-    var topicNew = 0
-    while (topicNew < K && p(topicNew) <= u) {
-      topicNew += 1
-    }
-    if (topicNew == K) topicNew -= 1
-    /*for (topic <- 0 until trnModel.K) {
-      if (trnModel.p(topic) > u) //sample topic w.r.t distribution p
-        break
-    }*/
-
-    // add newly estimated z_i to count variables
-    nw(w)(topicNew) += 1;
-    nd(m)(topicNew) += 1;
-    nwsum(topicNew) += 1;
-
-    (topicNew, nw, nd, nwsum)
-  }
-
-  def computeTheta(M: Int, K: Int, alpha: Double, nd: Array[Array[Int]], ndsum: Array[Int]): Array[Array[Double]] = {
-    var theta = Array.ofDim[Double](M, K)
-    for (m <- 0 until M) {
-      for (k <- 0 until K) {
-        theta(m)(k) = (nd(m)(k) + alpha) / (ndsum(m) + K * alpha)
-      }
-    }
-    theta
-  }
-
-  def computePhi(K: Int, V: Int, beta: Double, nw: Array[Array[Int]], nwsum: Array[Int]): Array[Array[Double]] = {
-    var phi = Array.ofDim[Double](K, V)
-    for (k <- 0 until K) {
-      for (w <- 0 until V) {
-        phi(k)(w) = (nw(w)(k) + beta) / (nwsum(k) + V * beta)
-      }
-    }
-    phi
   }
 }

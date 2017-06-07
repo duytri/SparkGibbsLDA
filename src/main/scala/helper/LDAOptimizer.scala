@@ -3,16 +3,16 @@ package main.scala.helper
 import org.apache.spark.graphx._
 import main.scala.obj.LDA.{ TopicCounts, TokenCount }
 import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.linalg.{DenseVector, Matrices, SparseVector, Vector, Vectors}
+import org.apache.spark.mllib.linalg.{ DenseVector, Matrices, SparseVector, Vector, Vectors }
 import main.scala.obj.LDA
-import breeze.linalg.{all, normalize, sum, DenseMatrix => BDM, DenseVector => BDV}
+import breeze.linalg.{ all, normalize, sum, DenseMatrix => BDM, DenseVector => BDV }
 import scala.util.Random
 import main.scala.obj.LDAModel
 import main.scala.obj.Model
 
 class LDAOptimizer {
   import LDA._
-  
+
   // Adjustable parameters
   var keepLastCheckpoint: Boolean = true
 
@@ -34,7 +34,7 @@ class LDAOptimizer {
     this.keepLastCheckpoint = keepLastCheckpoint
     this
   }
-  
+
   // The following fields will only be initialized through the initialize() method
   var graph: Graph[TopicCounts, TokenCount] = null
   var k: Int = 0
@@ -51,21 +51,14 @@ class LDAOptimizer {
   def initialize(
     docs: RDD[(Long, Vector)],
     lda: LDA): LDAOptimizer = {
-    // EMLDAOptimizer currently only supports symmetric document-topic priors
+    // LDAOptimizer currently only supports symmetric document-topic priors
     val docConcentration = lda.getDocConcentration
 
     val topicConcentration = lda.getTopicConcentration
     val k = lda.getK
 
-    // Note: The restriction > 1.0 may be relaxed in the future (allowing sparse solutions),
-    // but values in (0,1) are not yet supported.
-    require(docConcentration > 1.0 || docConcentration == -1.0, s"LDA docConcentration must be" +
-      s" > 1.0 (or -1 for auto) for EM Optimizer, but was set to $docConcentration")
-    require(topicConcentration > 1.0 || topicConcentration == -1.0, s"LDA topicConcentration " +
-      s"must be > 1.0 (or -1 for auto) for EM Optimizer, but was set to $topicConcentration")
-
-    this.docConcentration = if (docConcentration == -1) (50.0 / k) + 1.0 else docConcentration
-    this.topicConcentration = if (topicConcentration == -1) 1.1 else topicConcentration
+    this.docConcentration = if (docConcentration <= 0) 50.0 / k else docConcentration
+    this.topicConcentration = if (topicConcentration <= 0) 1.1 else topicConcentration
     val randomSeed = lda.getSeed
 
     // For each document, create an edge (Document -> Term) for each unique term in the document.
@@ -163,7 +156,7 @@ class LDAOptimizer {
     graph.vertices.filter(isTermVertex).values.fold(BDV.zeros[Double](numTopics))(_ += _)
   }
 
-  def getLDAModel(iterationTimes: Array[Double]): Model = {
+  def getLDAModel(iterationTimes: Array[Double]): LDAModel = {
     require(graph != null, "graph is null, LDAOptimizer not initialized.")
     val checkpointFiles: Array[String] = if (keepLastCheckpoint) {
       this.graphCheckpointer.deleteAllCheckpointsButLast()
