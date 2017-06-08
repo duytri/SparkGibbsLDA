@@ -90,6 +90,21 @@ object Utils {
   }
 
   /**
+   * Random topic for same words in a document
+   * @param K number of topic
+   * @param wordCount number of the same word in a document
+   * 
+   * @return vector number of word randomly assigned to each topic 
+   */
+  def randomVectorInt(K: Int, wordCount: Int): BDV[Double] = {
+    val gamma = BDV.fill[Double](K)(0d)
+    for (w <- 0 until wordCount) {
+      gamma(Math.floor(Math.random() * K).toInt) += 1d
+    }
+    gamma
+  }
+
+  /**
    * Load documents, tokenize them, create vocabulary, and prepare documents as term count vectors.
    * @return (corpus, vocabulary as array, total token count in corpus)
    */

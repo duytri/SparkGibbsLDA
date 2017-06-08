@@ -77,11 +77,9 @@ class LDAOptimizer {
       val verticesTMP: RDD[(VertexId, TopicCounts)] =
         edges.mapPartitionsWithIndex {
           case (partIndex, partEdges) =>
-            val random = new Random(partIndex + randomSeed)
             partEdges.flatMap { edge =>
-              val gamma = normalize(BDV.fill[Double](k)(random.nextDouble()), 1.0)
-              val sum = gamma * edge.attr
-              Seq((edge.srcId, sum), (edge.dstId, sum))
+              val gamma = Utils.randomVectorInt(k, edge.attr.toInt)
+              Seq((edge.srcId, gamma), (edge.dstId, gamma))
             }
         }
       verticesTMP.reduceByKey(_ + _)
@@ -114,7 +112,7 @@ class LDAOptimizer {
         // E-STEP: Compute gamma_{wjk} (smoothed topic distributions), scaled by token count
         // N_{wj}.
         val scaledTopicDistribution: TopicCounts =
-          computePTopic(edgeContext.srcAttr, edgeContext.dstAttr, N_k, W, eta, alpha) *= N_wj
+          computePTopic(edgeContext.srcAttr, edgeContext.dstAttr, N_k, W, eta, alpha)
         edgeContext.sendToDst((false, scaledTopicDistribution))
         edgeContext.sendToSrc((false, scaledTopicDistribution))
       }
@@ -169,6 +167,6 @@ class LDAOptimizer {
     // LDAModel.toLocal conversion.
     new LDAModel(this.graph, this.globalTopicTotals, this.k, this.vocabSize,
       Vectors.dense(Array.fill(this.k)(this.docConcentration)), this.topicConcentration,
-      iterationTimes, LDAModel.defaultGammaShape, checkpointFiles)
+      iterationTimes, checkpointFiles)
   }
 }

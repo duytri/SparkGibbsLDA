@@ -302,7 +302,7 @@ class LDAModel(
   def topicDistributions: RDD[(Long, Vector)] = {
     graph.vertices.filter(LDA.isDocumentVertex).map {
       case (docID, topicCounts) =>
-        (docID.toLong, Utils.vectorFromBreeze(normalize(topicCounts, 1.0)))
+        (docID.toLong, Utils.vectorFromBreeze(topicCounts))
     }
   }
 

@@ -3,8 +3,9 @@ package main.scala.obj
 import breeze.linalg.{ all, normalize, sum, DenseMatrix => BDM, DenseVector => BDV }
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
-import main.scala.helper.{LDAOptimizer, Utils}
+import org.apache.spark.mllib.linalg.{ Vector, Vectors }
+import main.scala.helper.{ LDAOptimizer, Utils }
+import scala.util.control.Breaks._
 
 object LDA {
   /*
@@ -89,21 +90,49 @@ object LDA {
     val N_j = docTopicCounts.data
     val N_w = termTopicCounts.data
     val N = totalTopicCounts.data
-    //val eta1 = eta - 1.0
-    //val alpha1 = alpha - 1.0
-    //val Weta1 = vocabSize * eta1
     val Weta = vocabSize * eta
-    var sum = 0.0
-    val gamma_wj = new Array[Double](K)
-    var k = 0
-    while (k < K) {
-      val gamma_wjk = (N_w(k)-1 + eta) * (N_j(k)-1 + alpha) / (N(k)-1 + Weta)
-      gamma_wj(k) = gamma_wjk
-      sum += gamma_wjk
-      k += 1
-    }
-    // normalize
-    BDV(gamma_wj) /= sum
+    val deltaTopic = BDV.fill[Double](K)(0d)
+    for (numTopic <- 0 until N_w.length) { // for each old topic
+      for (numWord <- 0 until N_w(numTopic).toInt) { // for each word in this topic
+        var gamma_wj = new Array[Double](K)
+        //do multinominal sampling via cumulative method
+        for (k <- 0 until K) {
+          gamma_wj(k) = (N_w(k) - 1 + eta) * (N_j(k) - 1 + alpha) / (N(k) - 1 + Weta)
+        }
+        // cumulate multinomial parameters
+        for (k <- 1 until K) {
+          gamma_wj(k) += gamma_wj(k - 1)
+        }
+        // scaled sample because of unnormalized p[]
+        val scale = Math.random() * gamma_wj(K - 1)
+        //sample topic w.r.t distribution p
+        var newTopic = 0
+        if (gamma_wj(0) <= scale) {
+          var low = 0
+          var high = K - 1
+          breakable {
+            while (low <= high) {
+              if (low == high - 1) {
+                newTopic = high
+                break
+              }
+              val mid = (low + high) / 2
+              if (gamma_wj(mid) > scale) high = mid
+              else low = mid
+            }
+          }
+        }
+
+        if (newTopic != numTopic) {
+          // update change of topic via deltaTopic
+          val delta = BDV.fill[Double](K)(0d)
+          delta(numTopic) -= 1
+          delta(newTopic) += 1
+          deltaTopic += delta
+        } else deltaTopic += BDV.fill[Double](K)(0d) // not change anything
+      } // end for each word in this topic
+    } // end for each old topic
+    return deltaTopic
   }
 }
 
@@ -115,8 +144,8 @@ class LDA private (
     private var seed: Long,
     private var checkpointInterval: Int,
     private var ldaOptimizer: LDAOptimizer) {
-  
-   /**
+
+  /**
    * Constructs a LDA instance with default parameters.
    */
   def this() = this(k = 10, maxIterations = 20, docConcentration = Vectors.dense(-1),
