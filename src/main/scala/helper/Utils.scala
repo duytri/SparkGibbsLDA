@@ -93,8 +93,8 @@ object Utils {
    * Random topic for same words in a document
    * @param K number of topic
    * @param wordCount number of the same word in a document
-   * 
-   * @return vector number of word randomly assigned to each topic 
+   *
+   * @return vector number of word randomly assigned to each topic
    */
   def randomVectorInt(K: Int, wordCount: Int): BDV[Double] = {
     val gamma = BDV.fill[Double](K)(0d)
@@ -141,8 +141,12 @@ object Utils {
       .zipWithIndex()
       .map(_.swap)
 
+    val vocabulary = model.stages(1).asInstanceOf[CountVectorizerModel].vocabulary
+    var totalTokens = documents.map(x => {
+      new BDV[Double](x._2.toArray)
+    }).fold(BDV.zeros[Double](vocabulary.length))(_ + _).fold(0d)(_ + _)
     (documents,
-      model.stages(1).asInstanceOf[CountVectorizerModel].vocabulary, // vocabulary
-      documents.map(_._2.numActives).sum().toLong) // total token count
+      vocabulary, // vocabulary
+      totalTokens.toLong) // total token count
   }
 }

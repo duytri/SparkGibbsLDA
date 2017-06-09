@@ -82,7 +82,7 @@ class LDAOptimizer {
               Seq((edge.srcId, gamma), (edge.dstId, gamma))
             }
         }
-      verticesTMP.reduceByKey(_ + _)
+      verticesTMP.reduceByKey((a, b) => a)
     }
 
     // Partition such that edges are grouped by document
@@ -113,22 +113,22 @@ class LDAOptimizer {
         // N_{wj}.
         val scaledTopicDistribution: TopicCounts =
           computePTopic(edgeContext.srcAttr, edgeContext.dstAttr, N_k, W, eta, alpha)
-        edgeContext.sendToDst((false, scaledTopicDistribution))
-        edgeContext.sendToSrc((false, scaledTopicDistribution))
+        edgeContext.sendToDst((false, edgeContext.dstAttr + scaledTopicDistribution))
+        edgeContext.sendToSrc((false, edgeContext.srcAttr + scaledTopicDistribution))
       }
     // The Boolean is a hack to detect whether we could modify the values in-place.
     // TODO: Add zero/seqOp/combOp option to aggregateMessages. (SPARK-5438)
     val mergeMsg: ((Boolean, TopicCounts), (Boolean, TopicCounts)) => (Boolean, TopicCounts) =
       (m0, m1) => {
-        val sum =
+        val choice =
           if (m0._1) {
-            m0._2 += m1._2
+            m0._2
           } else if (m1._1) {
-            m1._2 += m0._2
+            m1._2
           } else {
-            m0._2 + m1._2
+            m1._2
           }
-        (true, sum)
+        (true, choice)
       }
     // M-STEP: Aggregation computes new N_{kj}, N_{wk} counts.
     val docTopicDistributions: VertexRDD[TopicCounts] =

@@ -21,7 +21,6 @@ import main.scala.obj.LDAModel
 object SparkGibbsLDA {
 
   def main(args: Array[String]): Unit = {
-    println("Current directory: " + System.getProperty("user.dir"))
     println("#################### Gibbs sampling LDA in Apache Spark ####################")
     try {
       var cmd = LDACmdOption.getArguments(args)
@@ -42,22 +41,6 @@ object SparkGibbsLDA {
           val sc = spark.sparkContext
           
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
-          //println("#################### DAY LA PHAN THAN CUA CHUONG TRINH ####################")
-          /*val dataFiles = sc.wholeTextFiles(params.directory + "/*").map { _._2.trim }.map(_.split("\n"))
-          val vocab = dataFiles.flatMap(x => x).distinct()
-          val word2id = vocab.collect().zipWithIndex.toMap
-          val bcWord2Id = sc.broadcast(word2id)
-          val data = dataFiles.map(file => {
-            var ids = new ArrayBuffer[Double]
-            file.foreach(word => {
-              ids.append(bcWord2Id.value.get(word).get)
-            })
-            ids.toArray
-          })*/*/
-          //val parsedData = data.map(Vectors.dense(_))
-          // Index documents with unique IDs
-          //val corpus = parsedData.zipWithIndex.map(_.swap).cache()
-
           // Load documents, and prepare them for LDA.
           val preprocessStart = System.nanoTime()
           val (corpus, vocabArray, actualNumTokens) = Utils.preprocess(sc, params.directory + "/*")
@@ -82,7 +65,9 @@ object SparkGibbsLDA {
             .setMaxIterations(params.niters)
 
           val startTime = System.nanoTime()
+          // Estimate
           val ldaModel = lda.run(corpus)
+          
           val elapsed = (System.nanoTime() - startTime) / 1e6
 
           println(s"Finished training LDA model.  Summary:")
@@ -100,7 +85,7 @@ object SparkGibbsLDA {
           }
 
           // Print the topics, showing the top-weighted terms for each topic.
-          val topicIndices = ldaModel.describeTopics(params.twords)
+          val topicIndices = ldaModel.describeTopics(params.twords, params.beta, actualNumTokens)
           val topics = topicIndices.map {
             case (terms, termWeights) =>
               terms.zip(termWeights).map { case (term, weight) => (vocabArray(term.toInt), weight) }
@@ -108,12 +93,12 @@ object SparkGibbsLDA {
           println(s"${params.K} topics:")
           topics.zipWithIndex.foreach {
             case (topic, i) =>
-              println(s"TOPIC $i")
+              println(s"---------- TOPIC $i ---------")
               topic.foreach {
                 case (term, weight) =>
                   println(s"$term\t$weight")
               }
-              println()
+              println("---------------------------\n")
           }
 
           spark.stop()

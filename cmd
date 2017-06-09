@@ -10,3 +10,6 @@ bin/spark-submit ~/git/SparkGibbsLDA/target/scala-2.11/sparkgibbslda_2.11-0.1.ja
 
 bin/spark-submit --verbose --driver-memory 2560M --executor-memory 7680M ~/git/SparkGibbsLDA/target/scala-2.11/sparkgibbslda_2.11-0.1.jar -a 1.3 -b 1.5 -d hdfs://localhost:9000/input -K 10 -n 500 -t 15  >> ~/git/SparkGibbsLDA/logs2.txt
 
+bin/spark-submit --conf spark.executor.extraJavaOptions=-Xss50m --conf spark.driver.extraJavaOptions=-Xss50m --verbose --driver-memory 7680M --executor-memory 7680M ~/git/SparkGibbsLDA/target/scala-2.11/sparkgibbslda_2.11-0.1.jar -a 0.5 -b 0.3 -d hdfs://localhost:9000/input -K 5 -n 200 -t 10  >> ~/git/SparkGibbsLDA/logsXss8M.txt
+
+

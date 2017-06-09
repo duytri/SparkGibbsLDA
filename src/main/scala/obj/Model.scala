@@ -8,8 +8,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{ Row, SparkSession }
 import org.apache.hadoop.fs.Path
 
-import breeze.linalg.{argmax, argtopk, normalize, sum, DenseMatrix => BDM, DenseVector => BDV}
-import breeze.numerics.{exp, lgamma}
+import breeze.linalg.{ argmax, argtopk, normalize, sum, DenseMatrix => BDM, DenseVector => BDV }
+import breeze.numerics.{ exp, lgamma }
 
 import org.json4s.DefaultFormats
 import org.json4s.JsonDSL._
@@ -62,11 +62,13 @@ abstract class Model {
    * Return the topics described by weighted terms.
    *
    * @param maxTermsPerTopic  Maximum number of terms to collect for each topic.
+   * @param eta  Topics' distributions over terms.
+   * @param termSize  Actual terms size.
    * @return  Array over topics.  Each topic is represented as a pair of matching arrays:
    *          (term indices, term weights in topic).
    *          Each topic's terms are sorted in order of decreasing weight.
    */
-  def describeTopics(maxTermsPerTopic: Int): Array[(Array[Int], Array[Double])]
+  def describeTopics(maxTermsPerTopic: Int, eta: Double, vocabSize: Long): Array[(Array[Int], Array[Double])]
 
   /**
    * Return the topics described by weighted terms.
@@ -77,7 +79,7 @@ abstract class Model {
    *          (term indices, term weights in topic).
    *          Each topic's terms are sorted in order of decreasing weight.
    */
-  def describeTopics(): Array[(Array[Int], Array[Double])] = describeTopics(vocabSize)
+  def describeTopics(): Array[(Array[Int], Array[Double])] = describeTopics(vocabSize, topicConcentration, vocabSize)
 }
 
 /**
@@ -124,7 +126,7 @@ class LDAModel(
     Utils.matrixFromBreeze(brzTopics)
   }
 
-  override def describeTopics(maxTermsPerTopic: Int): Array[(Array[Int], Array[Double])] = {
+  override def describeTopics(maxTermsPerTopic: Int, eta: Double, termSize: Long): Array[(Array[Int], Array[Double])] = {
     val numTopics = k
     // Note: N_k is not needed to find the top terms, but it is needed to normalize weights
     //       to a distribution over terms.
@@ -140,7 +142,7 @@ class LDAModel(
           for ((termId, n_wk) <- termVertices) {
             var topic = 0
             while (topic < numTopics) {
-              queues(topic) += (n_wk(topic) / N_k(topic) -> index2term(termId.toInt))
+              queues(topic) += ((n_wk(topic) + eta) / (N_k(topic) + termSize * eta) -> index2term(termId.toInt))
               topic += 1
             }
           }
@@ -246,8 +248,6 @@ class LDAModel(
     // TODO: generalize this for asymmetric (non-scalar) alpha
     val alpha = this.docConcentration(0) // To avoid closure capture of enclosing object
     val eta = this.topicConcentration
-    //assert(eta > 1.0)
-    //assert(alpha > 1.0)
     val N_k = globalTopicTotals
     val smoothed_N_k: TopicCounts = N_k + (vocabSize * eta)
     // Edges: Compute token log probability from phi_{wk}, theta_{kj}.
