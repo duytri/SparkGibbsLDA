@@ -68,9 +68,9 @@ object LDA {
   type TokenCount = Double
 
   /** Term vertex IDs are {-1, -2, ..., -vocabSize} */
-  def term2index(term: Int): Long = -(1 + term.toLong)
+  def term2index(term: Int, distance: Long): Long = -(1 + term.toLong + distance)
 
-  def index2term(termIndex: Long): Int = -(1 + termIndex).toInt
+  def index2term(termIndex: Long, distance: Long): Int = -(1 + termIndex + distance).toInt
 
   def isDocumentVertex(v: (VertexId, _)): Boolean = v._1 >= 0
 
@@ -359,8 +359,8 @@ class LDA private (
    * @param maxIterations maximum iterations of LDA
    * @return  Inferred LDA model
    */
-  def run(documents: RDD[(Long, Vector)]): LDAModel = {
-    val state = ldaOptimizer.initialize(documents, this)
+  def run(documents: RDD[(Long, Vector)], vocabSize: Long): LDAModel = {
+    val state = ldaOptimizer.initialize(documents, vocabSize, this)
     var iter = 0
     val iterationTimes = Array.fill[Double](maxIterations)(0)
     while (iter < maxIterations) {

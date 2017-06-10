@@ -50,6 +50,7 @@ class LDAOptimizer {
    */
   def initialize(
     docs: RDD[(Long, Vector)],
+    vocabSize: Long,
     lda: LDA): LDAOptimizer = {
     // LDAOptimizer currently only supports symmetric document-topic priors
     val docConcentration = lda.getDocConcentration
@@ -67,7 +68,7 @@ class LDAOptimizer {
         // Add edges for terms with non-zero counts.
         Utils.asBreeze(termCounts).activeIterator.filter(_._2 != 0.0).map {
           case (term, cnt) =>
-            Edge(docID, term2index(term), cnt)
+            Edge(docID, term2index(term, docID * vocabSize), cnt)
         }
     }
 
@@ -75,14 +76,14 @@ class LDAOptimizer {
     // Initially, we use random soft assignments of tokens to topics (random gamma).
     val docTermVertices: RDD[(VertexId, TopicCounts)] = {
       val verticesTMP: RDD[(VertexId, TopicCounts)] =
-        edges.mapPartitionsWithIndex {
-          case (partIndex, partEdges) =>
-            partEdges.flatMap { edge =>
-              val gamma = Utils.randomVectorInt(k, edge.attr.toInt)
-              Seq((edge.srcId, gamma), (edge.dstId, gamma))
-            }
+        edges.flatMap { edge =>
+          val gamma = Utils.randomVectorInt(k, edge.attr.toInt)
+          Seq((edge.srcId, gamma), (edge.dstId, gamma))
         }
-      verticesTMP.reduceByKey((a, b) => a)
+      //val docVertices = verticesTMP.filter(LDA.isDocumentVertex).reduceByKey(_ + _) //.reduceByKey((a, b) => a)
+      //val termVertices = verticesTMP.filter(LDA.isTermVertex)
+      //docVertices ++ termVertices
+      verticesTMP
     }
 
     // Partition such that edges are grouped by document

@@ -68,7 +68,7 @@ abstract class Model {
    *          (term indices, term weights in topic).
    *          Each topic's terms are sorted in order of decreasing weight.
    */
-  def describeTopics(maxTermsPerTopic: Int, eta: Double, vocabSize: Long): Array[(Array[Int], Array[Double])]
+  def describeTopics(maxTermsPerTopic: Int): Array[Array[(Int, Double)]]
 
   /**
    * Return the topics described by weighted terms.
@@ -79,7 +79,7 @@ abstract class Model {
    *          (term indices, term weights in topic).
    *          Each topic's terms are sorted in order of decreasing weight.
    */
-  def describeTopics(): Array[(Array[Int], Array[Double])] = describeTopics(vocabSize, topicConcentration, vocabSize)
+  def describeTopics(): Array[Array[(Int, Double)]] = describeTopics(vocabSize)
 }
 
 /**
@@ -111,7 +111,7 @@ class LDAModel(
     val termTopicCounts: Array[(Int, TopicCounts)] =
       graph.vertices.filter(_._1 < 0).map {
         case (termIndex, cnts) =>
-          (index2term(termIndex), cnts)
+          (index2term(termIndex, vocabSize * getDocId(termIndex)), cnts)
       }.collect()
     // Convert to Matrix
     val brzTopics = BDM.zeros[Double](vocabSize, k)
@@ -126,35 +126,22 @@ class LDAModel(
     Utils.matrixFromBreeze(brzTopics)
   }
 
-  override def describeTopics(maxTermsPerTopic: Int, eta: Double, termSize: Long): Array[(Array[Int], Array[Double])] = {
+  def getDocId(termId: Long): Long = {
+    graph.edges.filter(_.dstId == termId).collect.apply(0).srcId
+  }
+
+  override def describeTopics(maxTermsPerTopic: Int): Array[Array[(Int, Double)]] = {
     val numTopics = k
-    // Note: N_k is not needed to find the top terms, but it is needed to normalize weights
-    //       to a distribution over terms.
-    val N_k: TopicCounts = globalTopicTotals
-    val topicsInQueues: Array[BPQ[(Double, Int)]] =
-      graph.vertices.filter(isTermVertex)
-        .mapPartitions { termVertices =>
-          // For this partition, collect the most common terms for each topic in queues:
-          //  queues(topic) = queue of (term weight, term index).
-          // Term weights are N_{wk} / N_k.
-          val queues =
-            Array.fill(numTopics)(new BPQ[(Double, Int)](maxTermsPerTopic))
-          for ((termId, n_wk) <- termVertices) {
-            var topic = 0
-            while (topic < numTopics) {
-              queues(topic) += ((n_wk(topic) + eta) / (N_k(topic) + termSize * eta) -> index2term(termId.toInt))
-              topic += 1
-            }
-          }
-          Iterator(queues)
-        }.reduce { (q1, q2) =>
-          q1.zip(q2).foreach { case (a, b) => a ++= b }
-          q1
-        }
-    topicsInQueues.map { q =>
-      val (termWeights, terms) = q.toArray.sortBy(-_._1).unzip
-      (terms.toArray, termWeights.toArray)
+    val phi = computePhi
+    val result = Array.ofDim[(Int, Double)](k, maxTermsPerTopic)
+    for (topic <- 0 until k) {
+      val maxVertexPerTopic = phi.filter(_._1 == topic).takeOrdered(maxTermsPerTopic)(Ordering[Double].reverse.on(_._3))
+      result(topic) = maxVertexPerTopic.map {
+        case (topicId, termId, phi) =>
+          (index2term(termId, vocabSize * getDocId(termId)), phi)
+      }
     }
+    return result
   }
 
   /**
@@ -213,7 +200,7 @@ class LDAModel(
           computePTopic(edgeContext.srcAttr, edgeContext.dstAttr, N_k, W, eta, alpha)
         // For this (doc j, term w), send top topic k to doc vertex.
         val topTopic: Int = argmax(scaledTopicDistribution)
-        val term: Int = index2term(edgeContext.dstId)
+        val term: Int = index2term(edgeContext.dstId, edgeContext.srcId * W)
         edgeContext.sendToSrc((Array(term), Array(topTopic)))
       }
     val mergeMsg: ((Array[Int], Array[Int]), (Array[Int], Array[Int])) => (Array[Int], Array[Int]) =
@@ -328,5 +315,62 @@ class LDAModel(
         }
         (docID.toLong, topIndices.toArray, weights.toArray)
     }
+  }
+
+  def computeTheta(): RDD[(VertexId, Int, Double)] = {
+    val alpha = this.docConcentration(0)
+    graph.vertices.filter(LDA.isDocumentVertex).flatMap {
+      case (docId, topicCounts) =>
+        topicCounts.mapPairs {
+          case (topicId, wordCounts) =>
+            val thetaMK = ((wordCounts + alpha) / (topicCounts.data.sum + topicCounts.length * alpha))
+            (docId, topicId, thetaMK)
+        }.toArray
+    }
+  }
+
+  def computePhi(): RDD[(Int, VertexId, Double)] = {
+    val eta = this.topicConcentration
+    val wordTopicCounts = this.globalTopicTotals
+    val vocabSize = this.vocabSize
+    graph.vertices.filter(LDA.isTermVertex).flatMap {
+      case (termId, topicCounts) =>
+        topicCounts.mapPairs {
+          case (topicId, wordCounts) =>
+            val phiKW = ((wordCounts + eta) / (wordTopicCounts.data(topicId) + vocabSize * eta))
+            (topicId, termId, phiKW)
+        }.toArray
+    }
+  }
+
+  def computePerplexity(tokenSize: Long): Double = {
+    val alpha = this.docConcentration(0)
+    val eta = this.topicConcentration
+    val wordTopicCounts = this.globalTopicTotals
+    val vocabSize = this.vocabSize
+    val sendMsg: EdgeContext[TopicCounts, TokenCount, Double] => Unit = (edgeContext) => {
+      var thetaDotPhi = 0d
+      edgeContext.srcAttr.activeIterator.foreach { // in a doc, foreach topic and number of words assigned to
+        case (topicId1, wordCount) =>
+          edgeContext.dstAttr.activeIterator.filter(_._1 == topicId1).foreach { // in a word, for each topic and number of instances assigned to
+            case (topicId2, instanceCount) =>
+              thetaDotPhi += ((wordCount + alpha) / (edgeContext.srcAttr.data.sum + edgeContext.srcAttr.length * alpha)) *
+                ((instanceCount + eta) / (wordTopicCounts.data(topicId1) + vocabSize * eta))
+          }
+      }
+      edgeContext.sendToDst(math.log(thetaDotPhi))
+    }
+    val mergMsg: (Double, Double) => Double =
+      (a, b) =>
+        a + b
+    val docSum = graph.aggregateMessages[Double](sendMsg, _ + _) // mergMsg)
+      .map(_._2).fold(0.0)(_ + _)
+    return math.exp(-1 * docSum / tokenSize)
+  }
+
+  def countGraphInfo() = {
+    println("Number of document vertices: " + graph.vertices.filter(LDA.isDocumentVertex).count())
+    println("Number of term vertices: " + graph.vertices.filter(LDA.isTermVertex).count())
+    println("Number of edges: " + graph.edges.count())
   }
 }

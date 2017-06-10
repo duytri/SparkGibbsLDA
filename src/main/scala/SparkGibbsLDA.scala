@@ -39,7 +39,7 @@ object SparkGibbsLDA {
           val conf = new SparkConf().setAppName("SparkGibbsLDA").setMaster("local[*]")
           val spark = SparkSession.builder().config(conf).getOrCreate()
           val sc = spark.sparkContext
-          
+
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           // Load documents, and prepare them for LDA.
           val preprocessStart = System.nanoTime()
@@ -66,8 +66,8 @@ object SparkGibbsLDA {
 
           val startTime = System.nanoTime()
           // Estimate
-          val ldaModel = lda.run(corpus)
-          
+          val ldaModel = lda.run(corpus, actualVocabSize)
+
           val elapsed = (System.nanoTime() - startTime) / 1e6
 
           println(s"Finished training LDA model.  Summary:")
@@ -79,17 +79,19 @@ object SparkGibbsLDA {
 
           if (ldaModel.isInstanceOf[LDAModel]) {
             val distLDAModel = ldaModel.asInstanceOf[LDAModel]
-            val avgLogLikelihood = distLDAModel.logLikelihood / actualCorpusSize.toDouble
-            println(s"\t Training data average log likelihood: $avgLogLikelihood")
+            val perplexity = distLDAModel.computePerplexity(actualNumTokens)
+            println(s"\t Training data perplexity: $perplexity")
             println()
           }
 
           // Print the topics, showing the top-weighted terms for each topic.
-          val topicIndices = ldaModel.describeTopics(params.twords, params.beta, actualNumTokens)
-          val topics = topicIndices.map {
-            case (terms, termWeights) =>
-              terms.zip(termWeights).map { case (term, weight) => (vocabArray(term.toInt), weight) }
-          }
+          val topicIndices = ldaModel.describeTopics(params.twords)
+          val topics = topicIndices.map(topic => {
+            topic.map {
+              case (termIndex, weight) =>
+                (vocabArray(termIndex), weight)
+            }
+          })
           println(s"${params.K} topics:")
           topics.zipWithIndex.foreach {
             case (topic, i) =>
@@ -100,8 +102,12 @@ object SparkGibbsLDA {
               }
               println("---------------------------\n")
           }
-
+          
+          //ldaModel.countGraphInfo()
+          
+          sc.stop()
           spark.stop()
+
         }
       }
     } catch {
