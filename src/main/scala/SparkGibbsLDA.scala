@@ -39,6 +39,7 @@ object SparkGibbsLDA {
           val conf = new SparkConf().setAppName("SparkGibbsLDA").setMaster("local[*]")
           val spark = SparkSession.builder().config(conf).getOrCreate()
           val sc = spark.sparkContext
+          sc.setLogLevel("ERROR")
 
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           // Load documents, and prepare them for LDA.
