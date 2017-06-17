@@ -17,6 +17,8 @@ import main.scala.obj.LDA
 import scala.collection.mutable.ArrayBuffer
 import main.scala.helper.Utils
 import main.scala.obj.LDAModel
+import main.scala.helper.LDAOptimizer
+import main.scala.obj.Model
 
 object SparkGibbsLDA {
 
@@ -37,9 +39,10 @@ object SparkGibbsLDA {
         } else {
           //~~~~~~~~~~~ Spark ~~~~~~~~~~~
           val conf = new SparkConf().setAppName("SparkGibbsLDA").setMaster("local[*]")
+            .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+            .registerKryoClasses(Array(classOf[LDA], classOf[LDAOptimizer], classOf[Model]))
           val spark = SparkSession.builder().config(conf).getOrCreate()
           val sc = spark.sparkContext
-          sc.setLogLevel("ERROR")
 
           //~~~~~~~~~~~ Body ~~~~~~~~~~~
           // Load documents, and prepare them for LDA.

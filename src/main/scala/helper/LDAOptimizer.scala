@@ -138,6 +138,7 @@ class LDAOptimizer {
     // Update the vertex descriptors with the new counts.
     val newGraph = Graph(docTopicDistributions, graph.edges)
     graph = newGraph
+    graph.cache()
     graphCheckpointer.update(newGraph)
     globalTopicTotals = computeGlobalTopicTotals()
     this

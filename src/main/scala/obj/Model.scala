@@ -240,8 +240,8 @@ class LDAModel(
     // Edges: Compute token log probability from phi_{wk}, theta_{kj}.
     val sendMsg: EdgeContext[TopicCounts, TokenCount, Double] => Unit = (edgeContext) => {
       val N_wj = edgeContext.attr
-      val smoothed_N_wk: TopicCounts = edgeContext.dstAttr + eta //(eta - 1.0)
-      val smoothed_N_kj: TopicCounts = edgeContext.srcAttr + alpha //(alpha - 1.0)
+      val smoothed_N_wk: TopicCounts = edgeContext.dstAttr + eta - 1.0
+      val smoothed_N_kj: TopicCounts = edgeContext.srcAttr + alpha - 1.0
       val phi_wk: TopicCounts = smoothed_N_wk :/ smoothed_N_k
       val theta_kj: TopicCounts = normalize(smoothed_N_kj, 1.0)
       val tokenLogLikelihood = N_wj * math.log(phi_wk.dot(theta_kj))
@@ -344,26 +344,21 @@ class LDAModel(
   }
 
   def computePerplexity(tokenSize: Long): Double = {
-    val alpha = this.docConcentration(0)
+    val alpha = this.docConcentration(0) // To avoid closure capture of enclosing object
     val eta = this.topicConcentration
-    val wordTopicCounts = this.globalTopicTotals
-    val vocabSize = this.vocabSize
+    val N_k = globalTopicTotals
+    val smoothed_N_k: TopicCounts = N_k + (vocabSize * eta)
+    // Edges: Compute token log probability from phi_{wk}, theta_{kj}.
     val sendMsg: EdgeContext[TopicCounts, TokenCount, Double] => Unit = (edgeContext) => {
-      var thetaDotPhi = 0d
-      edgeContext.srcAttr.activeIterator.foreach { // in a doc, foreach topic and number of words assigned to
-        case (topicId1, wordCount) =>
-          edgeContext.dstAttr.activeIterator.filter(_._1 == topicId1).foreach { // in a word, for each topic and number of instances assigned to
-            case (topicId2, instanceCount) =>
-              thetaDotPhi += ((wordCount + alpha) / (edgeContext.srcAttr.data.sum + edgeContext.srcAttr.length * alpha)) *
-                ((instanceCount + eta) / (wordTopicCounts.data(topicId1) + vocabSize * eta))
-          }
-      }
-      edgeContext.sendToDst(math.log(thetaDotPhi))
+      val N_wj = edgeContext.attr
+      val smoothed_N_wk: TopicCounts = edgeContext.dstAttr + eta - 1.0
+      val smoothed_N_kj: TopicCounts = edgeContext.srcAttr + alpha - 1.0
+      val phi_wk: TopicCounts = smoothed_N_wk :/ smoothed_N_k
+      val theta_kj: TopicCounts = normalize(smoothed_N_kj, 1.0)
+      val tokenLogLikelihood = N_wj * math.log(phi_wk.dot(theta_kj))
+      edgeContext.sendToDst(tokenLogLikelihood)
     }
-    val mergMsg: (Double, Double) => Double =
-      (a, b) =>
-        a + b
-    val docSum = graph.aggregateMessages[Double](sendMsg, _ + _) // mergMsg)
+    val docSum = graph.aggregateMessages[Double](sendMsg, _ + _)
       .map(_._2).fold(0.0)(_ + _)
     return math.exp(-1 * docSum / tokenSize)
   }
